@@ -10,8 +10,6 @@ paperurl: 'https://academicpages.github.io/files/paper3.pdf'
 citation: 'Poyraz, Ahmet Gokhan, et al. "Enhancing Diameter Measurement Accuracy in Machine Vision Applications." arXiv preprint arXiv:2508.03721 (2025).'
 ---
 
-Enhancing Diameter Measurement Accuracy in Machine Vision Applications  
-
 Submitted to Measurement, 2025  
 
 This work investigates scale-dependent bias in diameter measurement and proposes a multi-reference calibration strategy.
