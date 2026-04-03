@@ -1,7 +1,7 @@
 ---
 title: "Edge Detection Based Autofocus Algorithm to Detect Accurate Camera Working Distance"
 collection: publications
-category: manuscripts
+category: conferences
 permalink: /publication/autofocus-edge
 date: 2022-01-01
 venue: "Journal"
