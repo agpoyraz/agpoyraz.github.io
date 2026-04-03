@@ -10,8 +10,6 @@ paperurl: 'https://academicpages.github.io/files/paper3.pdf'
 citation: 'Poyraz, Ahmet Gökhan, et al. "Sub-Pixel counting based diameter measurement algorithm for industrial Machine vision." Measurement 225 (2024): 114063.'
 ---
 
-Published in Measurement, 2023  
-
 This paper presents a sub-pixel counting based approach for high-precision diameter measurement in industrial machine vision systems.
 
 Download Paper | Download Slides
