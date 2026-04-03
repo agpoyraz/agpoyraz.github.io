@@ -16,6 +16,11 @@ Published in Measurement, 2023
 
 This paper presents a sub-pixel counting based approach for high-precision diameter measurement in industrial machine vision systems.
 
-
+<details>
+  <summary><strong>Show Citation</strong></summary>
+  <p>
+  Poyraz, A. G. (2023). "Sub-pixel counting based diameter measurement algorithm for industrial machine vision." <i>Measurement</i>.
+  </p>
+</details>
 
 Download Paper | Download Slides
