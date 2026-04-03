@@ -10,8 +10,6 @@ paperurl: ''
 citation: 'Poyraz, Ahmet Gökhan, and Mehmet Kaçmaz. "Edge detection based autofocus algorithm to detect accurate camera working distance." Academic Perspective Procedia 5.3 (2022): 406-416.'
 ---
 
-Edge Detection Based Autofocus Algorithm to Detect Accurate Camera Working Distance  
-
 This work proposes an edge-based autofocus algorithm that determines the optimal camera working distance using focus measures derived from edge information.
 
 Download Paper | Download Slides
