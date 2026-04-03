@@ -10,9 +10,6 @@ paperurl: 'https://academicpages.github.io/files/paper3.pdf'
 citation: 'Poyraz, Ahmet Gökhan. "Sub-pixel concentricity estimation algorithm for industrial machine vision with an accompanying dataset." Eighteenth International Conference on Machine Vision (ICMV 2025). Vol. 14114. SPIE, 2026.'
 ---
 
-Published in ICMV, 2025  
-
 This study proposes a sub-pixel concentricity estimation algorithm and introduces a dataset for industrial validation.
-
 
 Download Paper | Download Slides
