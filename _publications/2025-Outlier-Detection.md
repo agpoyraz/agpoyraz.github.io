@@ -3,6 +3,7 @@ title: "Outlier Detection Algorithm for Circle Fitting"
 collection: publications
 category: manuscripts
 permalink: /publication/circle-fitting-outlier
+date: 2025
 slidesurl: ''
 paperurl: ''
 citation: 'Poyraz, Ahmet Gökhan. "Outlier Detection Algorithm for Circle Fitting." arXiv preprint arXiv:2508.03720 (2025).'
