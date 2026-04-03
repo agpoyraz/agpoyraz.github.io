@@ -3,7 +3,7 @@ title: "Sub-pixel counting based diameter measurement algorithm for industrial m
 collection: publications
 category: manuscripts
 permalink: /publication/diameter-measurement
-date: 2023-01-01
+date: 2024-01-01
 venue: "Measurement (Elsevier)"
 slidesurl: 'https://academicpages.github.io/files/slides3.pdf'
 paperurl: 'https://academicpages.github.io/files/paper3.pdf'
