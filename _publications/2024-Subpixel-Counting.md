@@ -9,8 +9,6 @@ slidesurl: 'https://academicpages.github.io/files/slides3.pdf'
 paperurl: 'https://academicpages.github.io/files/paper3.pdf'
 ---
 
-Sub-pixel counting based diameter measurement algorithm for industrial machine vision  
-
 Published in Measurement, 2023  
 
 This paper presents a sub-pixel counting based approach for high-precision diameter measurement in industrial machine vision systems.
