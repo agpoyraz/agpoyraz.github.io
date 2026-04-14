@@ -5,8 +5,8 @@ category: conferences
 permalink: /publication/concentricity
 date: 2025-01-01
 venue: "ICMV 2025"
-slidesurl: 'https://academicpages.github.io/files/slides3.pdf'
-paperurl: 'https://academicpages.github.io/files/paper3.pdf'
+slidesurl: ''
+paperurl: 'https://www.spiedigitallibrary.org/conference-proceedings-of-spie/14114/1411410/Sub-pixel-concentricity-estimation-algorithm-for-industrial-machine-vision-with/10.1117/12.3088462.short'
 citation: 'Poyraz, Ahmet Gökhan. "Sub-pixel concentricity estimation algorithm for industrial machine vision with an accompanying dataset." Eighteenth International Conference on Machine Vision (ICMV 2025). Vol. 14114. SPIE, 2026.'
 ---
 
