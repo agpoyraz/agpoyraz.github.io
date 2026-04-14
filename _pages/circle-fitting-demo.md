@@ -122,8 +122,8 @@ author_profile: false
 <div class="cf-container">
   <div class="cf-note">
     This page runs directly in JavaScript for speed.
-    Adjustable variables are <code>sigma</code>, <code>n_points</code>, <code>a</code>, and <code>b</code>.
-    The cluster outlier count is fixed as <code>int(n_points * 0.02)</code>.
+    Adjustable variables are <code>sigma</code>, <code>n_points</code>, <code>a</code>, <code>b</code>,
+    <code>cluster_ratio</code>, and <code>near_ratio</code>.
   </div>
 
   <div class="cf-grid">
@@ -150,6 +150,18 @@ author_profile: false
         <label for="b">b</label>
         <input type="range" id="b" min="100" max="1000" step="5" value="685">
         <div class="cf-value"><span id="b_val">685</span></div>
+      </div>
+
+      <div class="cf-group">
+        <label for="cluster_ratio">Cluster Outlier Ratio</label>
+        <input type="range" id="cluster_ratio" min="0" max="0.20" step="0.005" value="0.02">
+        <div class="cf-value"><span id="cluster_ratio_val">0.02</span></div>
+      </div>
+
+      <div class="cf-group">
+        <label for="near_ratio">Near-Ellipse Outlier Ratio</label>
+        <input type="range" id="near_ratio" min="0" max="0.20" step="0.005" value="0.02">
+        <div class="cf-value"><span id="near_ratio_val">0.02</span></div>
       </div>
 
       <div class="cf-group">
@@ -181,9 +193,9 @@ author_profile: false
       </div>
 
       <div class="cf-small">
-        Fixed settings:<br>
-        cluster_outliers = int(n_points × 0.02)<br>
-        near_ellipse_outliers = int(n_points × 0.02)<br>
+        Current settings:<br>
+        cluster_outliers = int(n_points × cluster_ratio)<br>
+        near_ellipse_outliers = int(n_points × near_ratio)<br>
         random_outliers = 0<br>
         random_seed = 42
       </div>
@@ -215,6 +227,8 @@ author_profile: false
                 <th>n_points</th>
                 <th>a</th>
                 <th>b</th>
+                <th>Cluster Ratio</th>
+                <th>Near Ratio</th>
                 <th>Outlier Method</th>
                 <th>Fitting Method</th>
                 <th>Total</th>
@@ -246,7 +260,7 @@ function mulberry32(a) {
     t = Math.imul(t ^ (t >>> 15), t | 1);
     t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  }
+  };
 }
 
 function randn(rng) {
@@ -282,6 +296,7 @@ function percentile(arr, p) {
 
 function linspace(start, end, n, endpoint = true) {
   const arr = [];
+  if (n <= 1) return [start];
   const step = endpoint ? (end - start) / (n - 1) : (end - start) / n;
   for (let i = 0; i < n; i++) {
     arr.push(start + i * step);
@@ -371,8 +386,8 @@ function generateSyntheticEllipse({
   const x_out_cluster = [];
   const y_out_cluster = [];
   for (let i = 0; i < cluster_outliers; i++) {
-    x_out_cluster.push((xc + a + 5) + randn(rng));
-    y_out_cluster.push(yc + randn(rng));
+    x_out_cluster.push((xc + a + 5) + 1 * randn(rng));
+    y_out_cluster.push(yc + 1 * randn(rng));
   }
 
   const x_out_near = [];
@@ -644,14 +659,17 @@ function fitGeometricLS(x, y, iterations = 12) {
   return [xc, yc, r];
 }
 
-function fitRANSAC(x, y, iterations = 80, threshold = 2.0) {
+function fitRANSAC(x, y, iterations = 80, threshold = 2.0, seed = 123456) {
   const n = x.length;
+  if (n < 3) throw new Error("Not enough points");
+
+  const rng = mulberry32(seed);
   let bestCount = -1;
   let best = null;
 
   for (let it = 0; it < iterations; it++) {
     const ids = new Set();
-    while (ids.size < 3) ids.add(Math.floor(Math.random() * n));
+    while (ids.size < 3) ids.add(Math.floor(rng() * n));
     const id = [...ids];
 
     try {
@@ -721,8 +739,9 @@ function fitIRLS(x, y, iterations = 10) {
     for (let i = 0; i < x.length; i++) {
       residuals.push(Math.abs(Math.hypot(x[i] - xc, y[i] - yc) - r));
     }
+
     const maxRes = Math.max(...residuals, 1e-6);
-    weights = residuals.map(v => 1 / Math.max(v, 1e-6) / (1 / maxRes));
+    weights = residuals.map(v => maxRes / Math.max(v, 1e-6));
   }
 
   return [xc, yc, r];
@@ -786,6 +805,8 @@ function currentParams() {
     n_points: parseInt(document.getElementById('n_points').value, 10),
     a: parseFloat(document.getElementById('a').value),
     b: parseFloat(document.getElementById('b').value),
+    cluster_ratio: parseFloat(document.getElementById('cluster_ratio').value),
+    near_ratio: parseFloat(document.getElementById('near_ratio').value),
     selected_outlier: document.getElementById('selected_outlier').value,
     selected_fitting: document.getElementById('selected_fitting').value
   };
@@ -800,6 +821,8 @@ function updateSliderValues() {
   document.getElementById('n_points_val').textContent = document.getElementById('n_points').value;
   document.getElementById('a_val').textContent = document.getElementById('a').value;
   document.getElementById('b_val').textContent = document.getElementById('b').value;
+  document.getElementById('cluster_ratio_val').textContent = document.getElementById('cluster_ratio').value;
+  document.getElementById('near_ratio_val').textContent = document.getElementById('near_ratio').value;
 }
 
 function renderScatter(scatter) {
@@ -929,6 +952,8 @@ function appendResultRow(data, params) {
     <td>${params.n_points}</td>
     <td>${params.a.toFixed(0)}</td>
     <td>${params.b.toFixed(0)}</td>
+    <td>${params.cluster_ratio.toFixed(3)}</td>
+    <td>${params.near_ratio.toFixed(3)}</td>
     <td>${data.selected_result.outlier_method}</td>
     <td>${data.selected_result.fitting_method}</td>
     <td>${data.counts.total}</td>
@@ -957,8 +982,8 @@ function runExperiment(params) {
   const n_points = params.n_points;
   const sigma = params.sigma;
 
-  const cluster_outliers = Math.floor(n_points * 0.02);
-  const near_ellipse_outliers = Math.floor(n_points * 0.02);
+  const cluster_outliers = Math.floor(n_points * params.cluster_ratio);
+  const near_ellipse_outliers = Math.floor(n_points * params.near_ratio);
   const random_outliers = 0;
   const random_seed = 42;
 
@@ -979,7 +1004,7 @@ function runExperiment(params) {
     "Geometric LS": fitGeometricLS,
     "Pratt": fitPrattLike,
     "Taubin": fitTaubin,
-    "RANSAC": fitRANSAC,
+    "RANSAC": (x, y) => fitRANSAC(x, y, 80, 2.0, 98765),
     "IRLS": fitIRLS,
     "EDCircle": fitEDCircle
   };
@@ -1046,7 +1071,7 @@ function runExperiment(params) {
       x0: x0_sel,
       y0: y0_sel,
       r: r_sel,
-      r_ref,
+      r_ref: r_ref,
       center_error: center_error_sel,
       radius_error: radius_error_sel
     }
@@ -1054,31 +1079,27 @@ function runExperiment(params) {
 }
 
 function runDemo() {
-  updateSliderValues();
-  setStatus('Running...');
-  const t0 = performance.now();
-
   try {
+    setStatus("Running...");
     const params = currentParams();
-    const data = runExperiment(params);
-    renderScatter(data.scatter);
-    renderRTheta(data.rtheta);
-    renderResultsBox(data);
-    appendResultRow(data, params);
-    const t1 = performance.now();
-    setStatus(`Completed in ${(t1 - t0).toFixed(0)} ms`);
+    const result = runExperiment(params);
+    renderScatter(result.scatter);
+    renderRTheta(result.rtheta);
+    renderResultsBox(result);
+    appendResultRow(result, params);
+    setStatus("Completed.");
   } catch (err) {
     console.error(err);
-    setStatus('Error: ' + err.message);
+    setStatus("Error: " + err.message);
   }
 }
 
-document.getElementById('run_btn').addEventListener('click', runDemo);
-document.getElementById('clear_table_btn').addEventListener('click', clearResultTable);
-
-document.querySelectorAll('input, select').forEach(el => {
+document.querySelectorAll('input[type="range"]').forEach(el => {
   el.addEventListener('input', updateSliderValues);
 });
+
+document.getElementById('run_btn').addEventListener('click', runDemo);
+document.getElementById('clear_table_btn').addEventListener('click', clearResultTable);
 
 updateSliderValues();
 runDemo();
