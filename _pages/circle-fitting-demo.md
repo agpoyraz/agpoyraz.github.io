@@ -393,9 +393,7 @@ function removeOutliersLocalZScoreProposed(x, y, threshold=3, window_size=60, st
   const r = [];
   for (let i = 0; i < x.length; i++) {
     theta.push(Math.atan2(y[i] - yc, x[i] - xc));
-    const dx = x[i] - xc;
-    const dy = y[i] - yc;
-    r.push(Math.sqrt(dx*dx + dy*dy));
+    r.push(Math.hypot(x[i] - xc, y[i] - yc));
   }
 
   const idx = Array.from(theta.keys()).sort((a,b) => theta[a] - theta[b]);
@@ -428,13 +426,15 @@ function removeOutliersLocalZScoreProposed(x, y, threshold=3, window_size=60, st
     }
   }
 
-  const x_f = [], y_f = [];
-  for (let i = 0; i < mask.length; i++) {
-    if (mask[i]) {
-      x_f.push(r_sorted[i] * Math.cos(theta_sorted[i]) + xc);
-      y_f.push(r_sorted[i] * Math.sin(theta_sorted[i]) + yc);
+  const x_f = [];
+  const y_f = [];
+  for (let k = 0; k < idx.length; k++) {
+    if (mask[k]) {
+      x_f.push(x[idx[k]]);
+      y_f.push(y[idx[k]]);
     }
   }
+
   return {x: x_f, y: y_f};
 }
 
