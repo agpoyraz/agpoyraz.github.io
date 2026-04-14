@@ -16,7 +16,7 @@ author_profile: false
 
   .cf-grid {
     display: grid;
-    grid-template-columns: 320px 1fr;
+    grid-template-columns: 340px 1fr;
     gap: 24px;
     align-items: start;
   }
@@ -41,7 +41,6 @@ author_profile: false
   }
 
   .cf-group input[type="range"],
-  .cf-group select,
   .cf-group button {
     width: 100%;
   }
@@ -113,6 +112,7 @@ author_profile: false
     .cf-grid {
       grid-template-columns: 1fr;
     }
+
     .cf-panel {
       position: static;
     }
@@ -122,8 +122,10 @@ author_profile: false
 <div class="cf-container">
   <div class="cf-note">
     This page runs directly in JavaScript for speed.
+    Only the proposed outlier detection method is used.
     Adjustable variables are <code>sigma</code>, <code>n_points</code>, <code>a</code>, <code>b</code>,
-    <code>cluster_ratio</code>, and <code>near_ratio</code>.
+    <code>cluster_ratio</code>, <code>near_ratio</code>, <code>threshold</code>,
+    <code>window_size</code>, and <code>std_window</code>.
   </div>
 
   <div class="cf-grid">
@@ -165,26 +167,21 @@ author_profile: false
       </div>
 
       <div class="cf-group">
-        <label for="selected_outlier">Outlier Removal Method</label>
-        <select id="selected_outlier">
-          <option>None</option>
-          <option>Proposed Local Z-Score</option>
-          <option>Z-Score</option>
-          <option>MAD</option>
-          <option>Percentile</option>
-        </select>
+        <label for="threshold">threshold</label>
+        <input type="range" id="threshold" min="0.5" max="10" step="0.1" value="3">
+        <div class="cf-value"><span id="threshold_val">3</span></div>
       </div>
 
       <div class="cf-group">
-        <label for="selected_fitting">Fitting Method</label>
-        <select id="selected_fitting">
-          <option>Geometric LS</option>
-          <option>Pratt</option>
-          <option>Taubin</option>
-          <option>RANSAC</option>
-          <option>IRLS</option>
-          <option>EDCircle</option>
-        </select>
+        <label for="window_size">window_size</label>
+        <input type="range" id="window_size" min="5" max="300" step="1" value="60">
+        <div class="cf-value"><span id="window_size_val">60</span></div>
+      </div>
+
+      <div class="cf-group">
+        <label for="std_window">std_window</label>
+        <input type="range" id="std_window" min="5" max="300" step="1" value="60">
+        <div class="cf-value"><span id="std_window_val">60</span></div>
       </div>
 
       <div class="cf-group cf-row-btns">
@@ -193,7 +190,7 @@ author_profile: false
       </div>
 
       <div class="cf-small">
-        Current settings:<br>
+        Method: Proposed Local Z-Score<br>
         cluster_outliers = int(n_points × cluster_ratio)<br>
         near_ellipse_outliers = int(n_points × near_ratio)<br>
         random_outliers = 0<br>
@@ -229,16 +226,12 @@ author_profile: false
                 <th>b</th>
                 <th>Cluster Ratio</th>
                 <th>Near Ratio</th>
-                <th>Outlier Method</th>
-                <th>Fitting Method</th>
+                <th>threshold</th>
+                <th>window_size</th>
+                <th>std_window</th>
                 <th>Total</th>
                 <th>Removed</th>
                 <th>Remaining</th>
-                <th>xc</th>
-                <th>yc</th>
-                <th>r</th>
-                <th>Center Err</th>
-                <th>Radius Err</th>
               </tr>
             </thead>
             <tbody></tbody>
@@ -285,15 +278,6 @@ function std(arr) {
   return Math.sqrt(mean(arr.map(v => (v - m) * (v - m))));
 }
 
-function percentile(arr, p) {
-  const s = [...arr].sort((a, b) => a - b);
-  const idx = (p / 100) * (s.length - 1);
-  const lo = Math.floor(idx);
-  const hi = Math.ceil(idx);
-  if (lo === hi) return s[lo];
-  return s[lo] + (idx - lo) * (s[hi] - s[lo]);
-}
-
 function linspace(start, end, n, endpoint = true) {
   const arr = [];
   if (n <= 1) return [start];
@@ -312,54 +296,6 @@ function shuffleTogether(arrs, rng) {
       [arr[i], arr[j]] = [arr[j], arr[i]];
     }
   }
-}
-
-function solve3x3(A, b) {
-  const M = A.map((row, i) => [...row, b[i]]);
-  for (let i = 0; i < 3; i++) {
-    let maxRow = i;
-    for (let k = i + 1; k < 3; k++) {
-      if (Math.abs(M[k][i]) > Math.abs(M[maxRow][i])) maxRow = k;
-    }
-    [M[i], M[maxRow]] = [M[maxRow], M[i]];
-    const piv = M[i][i];
-    if (Math.abs(piv) < 1e-12) throw new Error("Singular matrix");
-    for (let j = i; j < 4; j++) M[i][j] /= piv;
-    for (let k = 0; k < 3; k++) {
-      if (k !== i) {
-        const factor = M[k][i];
-        for (let j = i; j < 4; j++) M[k][j] -= factor * M[i][j];
-      }
-    }
-  }
-  return [M[0][3], M[1][3], M[2][3]];
-}
-
-function solve2x2(A, b) {
-  const det = A[0][0] * A[1][1] - A[0][1] * A[1][0];
-  if (Math.abs(det) < 1e-12) throw new Error("Singular 2x2");
-  const x = (b[0] * A[1][1] - b[1] * A[0][1]) / det;
-  const y = (A[0][0] * b[1] - A[1][0] * b[0]) / det;
-  return [x, y];
-}
-
-function circleFrom3Points(x1, y1, x2, y2, x3, y3) {
-  const A = [
-    [2 * x1, 2 * y1, 1],
-    [2 * x2, 2 * y2, 1],
-    [2 * x3, 2 * y3, 1]
-  ];
-  const b = [
-    x1 * x1 + y1 * y1,
-    x2 * x2 + y2 * y2,
-    x3 * x3 + y3 * y3
-  ];
-  const c = solve3x3(A, b);
-  const xc = c[0];
-  const yc = c[1];
-  const r2 = c[2] + xc * xc + yc * yc;
-  if (r2 <= 0) throw new Error("Invalid radius");
-  return [xc, yc, Math.sqrt(r2)];
 }
 
 function generateSyntheticEllipse({
@@ -427,59 +363,6 @@ function generateSyntheticEllipse({
   };
 }
 
-function computeRadiusFromCenter(x, y, xc, yc) {
-  const r = [];
-  for (let i = 0; i < x.length; i++) {
-    r.push(Math.hypot(x[i] - xc, y[i] - yc));
-  }
-  return r;
-}
-
-function removeOutliersNone(x, y) {
-  return { x: [...x], y: [...y] };
-}
-
-function removeOutliersZScore(x, y, threshold = 3.0) {
-  const xm = mean(x);
-  const ym = mean(y);
-  const r = computeRadiusFromCenter(x, y, xm, ym);
-  const mr = mean(r);
-  const sr = std(r);
-  if (sr < 1e-12) return { x: [...x], y: [...y] };
-  const keep = r.map(v => Math.abs((v - mr) / sr) < threshold);
-  return {
-    x: x.filter((_, i) => keep[i]),
-    y: y.filter((_, i) => keep[i])
-  };
-}
-
-function removeOutliersMAD(x, y, threshold = 3.5) {
-  const xm = median(x);
-  const ym = median(y);
-  const r = computeRadiusFromCenter(x, y, xm, ym);
-  const mr = median(r);
-  const mad = median(r.map(v => Math.abs(v - mr)));
-  if (mad < 1e-12) return { x: [...x], y: [...y] };
-  const keep = r.map(v => Math.abs(v - mr) / mad < threshold);
-  return {
-    x: x.filter((_, i) => keep[i]),
-    y: y.filter((_, i) => keep[i])
-  };
-}
-
-function removeOutliersPercentile(x, y, lower = 2.275, upper = 97.725) {
-  const xm = mean(x);
-  const ym = mean(y);
-  const r = computeRadiusFromCenter(x, y, xm, ym);
-  const low = percentile(r, lower);
-  const high = percentile(r, upper);
-  const keep = r.map(v => v >= low && v <= high);
-  return {
-    x: x.filter((_, i) => keep[i]),
-    y: y.filter((_, i) => keep[i])
-  };
-}
-
 function removeOutliersLocalZScoreProposed(x, y, threshold = 3, window_size = 60, std_window = 60) {
   const xc = mean(x);
   const yc = mean(y);
@@ -492,6 +375,7 @@ function removeOutliersLocalZScoreProposed(x, y, threshold = 3, window_size = 60
   }
 
   const idx = Array.from(theta.keys()).sort((a, b) => theta[a] - theta[b]);
+  const theta_sorted = idx.map(i => theta[i]);
   const r_sorted = idx.map(i => r[i]);
 
   const std_list = [];
@@ -534,236 +418,6 @@ function removeOutliersLocalZScoreProposed(x, y, threshold = 3, window_size = 60
   return { x: x_f, y: y_f };
 }
 
-function fitPrattLike(x, y) {
-  const xm = mean(x);
-  const ym = mean(y);
-  const u = x.map(v => v - xm);
-  const v = y.map(vv => vv - ym);
-
-  let Suu = 0, Suv = 0, Svv = 0, Suuu = 0, Suvv = 0, Svvv = 0, Svuu = 0;
-
-  for (let i = 0; i < x.length; i++) {
-    Suu += u[i] * u[i];
-    Suv += u[i] * v[i];
-    Svv += v[i] * v[i];
-    Suuu += u[i] * u[i] * u[i];
-    Suvv += u[i] * v[i] * v[i];
-    Svvv += v[i] * v[i] * v[i];
-    Svuu += v[i] * u[i] * u[i];
-  }
-
-  const A = [[Suu, Suv], [Suv, Svv]];
-  const b = [0.5 * (Suuu + Suvv), 0.5 * (Svvv + Svuu)];
-  const [uc, vc] = solve2x2(A, b);
-
-  const xc = xm + uc;
-  const yc = ym + vc;
-  const r = mean(computeRadiusFromCenter(x, y, xc, yc));
-  return [xc, yc, r];
-}
-
-function fitTaubin(x, y) {
-  const xm = mean(x);
-  const ym = mean(y);
-  const u = x.map(v => v - xm);
-  const v = y.map(vv => vv - ym);
-
-  let Suu = 0, Suv = 0, Svv = 0, Suuu = 0, Suvv = 0, Svvv = 0, Svuu = 0;
-
-  for (let i = 0; i < x.length; i++) {
-    Suu += u[i] * u[i];
-    Suv += u[i] * v[i];
-    Svv += v[i] * v[i];
-    Suuu += u[i] * u[i] * u[i];
-    Suvv += u[i] * v[i] * v[i];
-    Svvv += v[i] * v[i] * v[i];
-    Svuu += v[i] * u[i] * u[i];
-  }
-
-  const A = [[Suu, Suv], [Suv, Svv]];
-  const B = [0.5 * (Suuu + Suvv), 0.5 * (Svvv + Svuu)];
-  const [uc, vc] = solve2x2(A, B);
-
-  const xc = xm + uc;
-  const yc = ym + vc;
-  const r = Math.sqrt(uc * uc + vc * vc + (Suu + Svv) / x.length);
-  return [xc, yc, r];
-}
-
-function fitEDCircle(x, y) {
-  const A11 = x.reduce((s, v) => s + v * v, 0);
-  const A12 = x.reduce((s, v, i) => s + v * y[i], 0);
-  const A13 = x.reduce((s, v) => s + v, 0);
-  const A22 = y.reduce((s, v) => s + v * v, 0);
-  const A23 = y.reduce((s, v) => s + v, 0);
-  const A33 = x.length;
-
-  const b1 = x.reduce((s, v, i) => s - v * (x[i] * x[i] + y[i] * y[i]), 0);
-  const b2 = y.reduce((s, v, i) => s - v * (x[i] * x[i] + y[i] * y[i]), 0);
-  const b3 = x.reduce((s, v, i) => s - (x[i] * x[i] + y[i] * y[i]), 0);
-
-  const sol = solve3x3(
-    [[A11, A12, A13], [A12, A22, A23], [A13, A23, A33]],
-    [b1, b2, b3]
-  );
-
-  const D = sol[0];
-  const E = sol[1];
-  const F = sol[2];
-  const xc = -D / 2;
-  const yc = -E / 2;
-  const rr = (D * D + E * E) / 4 - F;
-  if (rr <= 0) throw new Error("Invalid radius");
-  return [xc, yc, Math.sqrt(rr)];
-}
-
-function fitGeometricLS(x, y, iterations = 12) {
-  let [xc, yc, r] = fitTaubin(x, y);
-
-  for (let it = 0; it < iterations; it++) {
-    let J11 = 0, J12 = 0, J13 = 0, J22 = 0, J23 = 0, J33 = x.length;
-    let B1 = 0, B2 = 0, B3 = 0;
-
-    for (let i = 0; i < x.length; i++) {
-      const dx = xc - x[i];
-      const dy = yc - y[i];
-      const di = Math.sqrt(dx * dx + dy * dy) + 1e-12;
-      const fi = di - r;
-
-      const j1 = dx / di;
-      const j2 = dy / di;
-      const j3 = -1;
-
-      J11 += j1 * j1;
-      J12 += j1 * j2;
-      J13 += j1 * j3;
-      J22 += j2 * j2;
-      J23 += j2 * j3;
-      B1 += j1 * fi;
-      B2 += j2 * fi;
-      B3 += j3 * fi;
-    }
-
-    const delta = solve3x3(
-      [[J11, J12, J13], [J12, J22, J23], [J13, J23, J33]],
-      [-B1, -B2, -B3]
-    );
-
-    xc += delta[0];
-    yc += delta[1];
-    r += delta[2];
-
-    if (Math.abs(delta[0]) + Math.abs(delta[1]) + Math.abs(delta[2]) < 1e-6) break;
-  }
-
-  return [xc, yc, r];
-}
-
-function fitRANSAC(x, y, iterations = 80, threshold = 2.0, seed = 123456) {
-  const n = x.length;
-  if (n < 3) throw new Error("Not enough points");
-
-  const rng = mulberry32(seed);
-  let bestCount = -1;
-  let best = null;
-
-  for (let it = 0; it < iterations; it++) {
-    const ids = new Set();
-    while (ids.size < 3) ids.add(Math.floor(rng() * n));
-    const id = [...ids];
-
-    try {
-      const [xc, yc, r] = circleFrom3Points(
-        x[id[0]], y[id[0]],
-        x[id[1]], y[id[1]],
-        x[id[2]], y[id[2]]
-      );
-
-      let count = 0;
-      for (let i = 0; i < n; i++) {
-        const d = Math.hypot(x[i] - xc, y[i] - yc);
-        if (Math.abs(d - r) < threshold) count++;
-      }
-
-      if (count > bestCount) {
-        bestCount = count;
-        best = [xc, yc, r];
-      }
-    } catch (e) {}
-  }
-
-  if (!best) return fitTaubin(x, y);
-  return best;
-}
-
-function fitIRLS(x, y, iterations = 10) {
-  let weights = Array(x.length).fill(1);
-  let xc = mean(x);
-  let yc = mean(y);
-  let r = mean(computeRadiusFromCenter(x, y, xc, yc));
-
-  for (let it = 0; it < iterations; it++) {
-    let A11 = 0, A12 = 0, A13 = 0, A22 = 0, A23 = 0, A33 = 0;
-    let b1 = 0, b2 = 0, b3 = 0;
-
-    for (let i = 0; i < x.length; i++) {
-      const w = weights[i];
-      const xx = x[i];
-      const yy = y[i];
-
-      A11 += w * 4 * xx * xx;
-      A12 += w * 4 * xx * yy;
-      A13 += w * 2 * xx;
-      A22 += w * 4 * yy * yy;
-      A23 += w * 2 * yy;
-      A33 += w;
-
-      const bb = xx * xx + yy * yy;
-      b1 += w * 2 * xx * bb;
-      b2 += w * 2 * yy * bb;
-      b3 += w * bb;
-    }
-
-    const c = solve3x3(
-      [[A11, A12, A13], [A12, A22, A23], [A13, A23, A33]],
-      [b1, b2, b3]
-    );
-
-    xc = c[0];
-    yc = c[1];
-    const rr = c[2] + xc * xc + yc * yc;
-    if (rr <= 0) break;
-    r = Math.sqrt(rr);
-
-    const residuals = [];
-    for (let i = 0; i < x.length; i++) {
-      residuals.push(Math.abs(Math.hypot(x[i] - xc, y[i] - yc) - r));
-    }
-
-    const maxRes = Math.max(...residuals, 1e-6);
-    weights = residuals.map(v => maxRes / Math.max(v, 1e-6));
-  }
-
-  return [xc, yc, r];
-}
-
-function plotRThetaArrays(x, y, xc_ref, yc_ref) {
-  const data = [];
-
-  for (let i = 0; i < x.length; i++) {
-    const th = Math.atan2(y[i] - yc_ref, x[i] - xc_ref);
-    const rr = Math.hypot(x[i] - xc_ref, y[i] - yc_ref);
-    data.push({ th, rr });
-  }
-
-  data.sort((a, b) => a.th - b.th);
-
-  return {
-    theta: data.map(v => v.th),
-    r: data.map(v => v.rr)
-  };
-}
-
 function splitDetectedOutliers(allX, allY, filtX, filtY) {
   const removedX = [];
   const removedY = [];
@@ -799,6 +453,23 @@ function splitDetectedOutliers(allX, allY, filtX, filtY) {
   return { keptX, keptY, removedX, removedY };
 }
 
+function plotRThetaArrays(x, y, xc_ref, yc_ref) {
+  const data = [];
+
+  for (let i = 0; i < x.length; i++) {
+    const th = Math.atan2(y[i] - yc_ref, x[i] - xc_ref);
+    const rr = Math.hypot(x[i] - xc_ref, y[i] - yc_ref);
+    data.push({ th, rr });
+  }
+
+  data.sort((a, b) => a.th - b.th);
+
+  return {
+    theta: data.map(v => v.th),
+    r: data.map(v => v.rr)
+  };
+}
+
 function currentParams() {
   return {
     sigma: parseFloat(document.getElementById('sigma').value),
@@ -807,8 +478,9 @@ function currentParams() {
     b: parseFloat(document.getElementById('b').value),
     cluster_ratio: parseFloat(document.getElementById('cluster_ratio').value),
     near_ratio: parseFloat(document.getElementById('near_ratio').value),
-    selected_outlier: document.getElementById('selected_outlier').value,
-    selected_fitting: document.getElementById('selected_fitting').value
+    threshold: parseFloat(document.getElementById('threshold').value),
+    window_size: parseInt(document.getElementById('window_size').value, 10),
+    std_window: parseInt(document.getElementById('std_window').value, 10)
   };
 }
 
@@ -823,6 +495,9 @@ function updateSliderValues() {
   document.getElementById('b_val').textContent = document.getElementById('b').value;
   document.getElementById('cluster_ratio_val').textContent = document.getElementById('cluster_ratio').value;
   document.getElementById('near_ratio_val').textContent = document.getElementById('near_ratio').value;
+  document.getElementById('threshold_val').textContent = document.getElementById('threshold').value;
+  document.getElementById('window_size_val').textContent = document.getElementById('window_size').value;
+  document.getElementById('std_window_val').textContent = document.getElementById('std_window').value;
 }
 
 function renderScatter(scatter) {
@@ -850,38 +525,6 @@ function renderScatter(scatter) {
       type: 'scatter',
       name: 'Filtered Outliers',
       marker: { size: 7, color: '#2ca02c', symbol: 'x' }
-    },
-    {
-      x: scatter.x_circle_ref,
-      y: scatter.y_circle_ref,
-      mode: 'lines',
-      type: 'scatter',
-      name: 'Reference Circle',
-      line: { width: 2, color: '#444' }
-    },
-    {
-      x: scatter.x_circle_fit,
-      y: scatter.y_circle_fit,
-      mode: 'lines',
-      type: 'scatter',
-      name: 'Fitted Circle',
-      line: { width: 3, color: '#9467bd' }
-    },
-    {
-      x: [scatter.x_true_center],
-      y: [scatter.y_true_center],
-      mode: 'markers',
-      type: 'scatter',
-      name: 'True Center',
-      marker: { size: 11, symbol: 'cross', color: '#000' }
-    },
-    {
-      x: [scatter.x_est_center],
-      y: [scatter.y_est_center],
-      mode: 'markers',
-      type: 'scatter',
-      name: 'Estimated Center',
-      marker: { size: 10, symbol: 'square', color: '#ff1493' }
     }
   ];
 
@@ -923,21 +566,17 @@ function renderRTheta(rtheta) {
 
 function renderResultsBox(data) {
   document.getElementById('result_box').innerHTML = `
-    <strong>Selected Combination</strong><br><br>
-    <strong>Outlier Removal:</strong> ${data.selected_result.outlier_method}<br>
-    <strong>Fitting Method:</strong> ${data.selected_result.fitting_method}<br><br>
+    <strong>Method</strong><br><br>
+    <strong>Outlier Removal:</strong> Proposed Local Z-Score<br><br>
 
     <strong>Total points:</strong> ${data.counts.total}<br>
     <strong>True outliers:</strong> ${data.counts.true_outlier_total}<br>
     <strong>Remaining after filtering:</strong> ${data.counts.remaining}<br>
     <strong>Removed:</strong> ${data.counts.removed}<br><br>
 
-    <strong>Estimated xc:</strong> ${data.selected_result.x0.toFixed(4)}<br>
-    <strong>Estimated yc:</strong> ${data.selected_result.y0.toFixed(4)}<br>
-    <strong>Estimated r:</strong> ${data.selected_result.r.toFixed(4)}<br>
-    <strong>Reference r:</strong> ${data.selected_result.r_ref.toFixed(4)}<br>
-    <strong>Center error:</strong> ${data.selected_result.center_error.toFixed(4)}<br>
-    <strong>Radius error:</strong> ${data.selected_result.radius_error.toFixed(4)}
+    <strong>threshold:</strong> ${data.params.threshold.toFixed(2)}<br>
+    <strong>window_size:</strong> ${data.params.window_size}<br>
+    <strong>std_window:</strong> ${data.params.std_window}
   `;
 }
 
@@ -954,16 +593,12 @@ function appendResultRow(data, params) {
     <td>${params.b.toFixed(0)}</td>
     <td>${params.cluster_ratio.toFixed(3)}</td>
     <td>${params.near_ratio.toFixed(3)}</td>
-    <td>${data.selected_result.outlier_method}</td>
-    <td>${data.selected_result.fitting_method}</td>
+    <td>${params.threshold.toFixed(2)}</td>
+    <td>${params.window_size}</td>
+    <td>${params.std_window}</td>
     <td>${data.counts.total}</td>
     <td>${data.counts.removed}</td>
     <td>${data.counts.remaining}</td>
-    <td>${data.selected_result.x0.toFixed(4)}</td>
-    <td>${data.selected_result.y0.toFixed(4)}</td>
-    <td>${data.selected_result.r.toFixed(4)}</td>
-    <td>${data.selected_result.center_error.toFixed(4)}</td>
-    <td>${data.selected_result.radius_error.toFixed(4)}</td>
   `;
 
   tbody.appendChild(tr);
@@ -977,52 +612,38 @@ function clearResultTable() {
 function runExperiment(params) {
   const xc = 500;
   const yc = 500;
-  const a = params.a;
-  const b = params.b;
-  const n_points = params.n_points;
-  const sigma = params.sigma;
 
-  const cluster_outliers = Math.floor(n_points * params.cluster_ratio);
-  const near_ellipse_outliers = Math.floor(n_points * params.near_ratio);
+  const cluster_outliers = Math.floor(params.n_points * params.cluster_ratio);
+  const near_ellipse_outliers = Math.floor(params.n_points * params.near_ratio);
   const random_outliers = 0;
   const random_seed = 42;
 
   const data = generateSyntheticEllipse({
-    xc, yc, a, b, n_points, sigma,
-    cluster_outliers, near_ellipse_outliers, random_outliers, random_seed
+    xc,
+    yc,
+    a: params.a,
+    b: params.b,
+    n_points: params.n_points,
+    sigma: params.sigma,
+    cluster_outliers,
+    near_ellipse_outliers,
+    random_outliers,
+    random_seed
   });
 
-  const outlierMethods = {
-    "None": removeOutliersNone,
-    "Proposed Local Z-Score": removeOutliersLocalZScoreProposed,
-    "Z-Score": removeOutliersZScore,
-    "MAD": removeOutliersMAD,
-    "Percentile": removeOutliersPercentile
-  };
-
-  const fittingMethods = {
-    "Geometric LS": fitGeometricLS,
-    "Pratt": fitPrattLike,
-    "Taubin": fitTaubin,
-    "RANSAC": (x, y) => fitRANSAC(x, y, 80, 2.0, 98765),
-    "IRLS": fitIRLS,
-    "EDCircle": fitEDCircle
-  };
-
-  const r_ref = (a + b) / 2.0;
-
-  const cleanedSelected = outlierMethods[params.selected_outlier](data.X, data.Y);
-  const [x0_sel, y0_sel, r_sel] =
-    fittingMethods[params.selected_fitting](cleanedSelected.x, cleanedSelected.y);
-
-  const center_error_sel = Math.hypot(x0_sel - xc, y0_sel - yc);
-  const radius_error_sel = Math.abs(r_sel - r_ref);
+  const cleaned = removeOutliersLocalZScoreProposed(
+    data.X,
+    data.Y,
+    params.threshold,
+    params.window_size,
+    params.std_window
+  );
 
   const splitDetected = splitDetectedOutliers(
     data.X,
     data.Y,
-    cleanedSelected.x,
-    cleanedSelected.y
+    cleaned.x,
+    cleaned.y
   );
 
   const rtOrig = plotRThetaArrays(data.X, data.Y, xc, yc);
@@ -1030,17 +651,12 @@ function runExperiment(params) {
     ? plotRThetaArrays(splitDetected.removedX, splitDetected.removedY, xc, yc)
     : { theta: [], r: [] };
 
-  const th = linspace(0, 2 * Math.PI, 400, true);
-  const x_circle_ref = th.map(t => xc + r_ref * Math.cos(t));
-  const y_circle_ref = th.map(t => yc + r_ref * Math.sin(t));
-  const x_circle_fit = th.map(t => x0_sel + r_sel * Math.cos(t));
-  const y_circle_fit = th.map(t => y0_sel + r_sel * Math.sin(t));
-
   return {
+    params,
     counts: {
       total: data.X.length,
-      remaining: cleanedSelected.x.length,
-      removed: data.X.length - cleanedSelected.x.length,
+      remaining: cleaned.x.length,
+      removed: data.X.length - cleaned.x.length,
       true_outlier_total: data.x_out_cluster.length + data.x_out_near.length + data.x_out_random.length
     },
     scatter: {
@@ -1049,31 +665,13 @@ function runExperiment(params) {
       x_true_outlier: [...data.x_out_cluster, ...data.x_out_near, ...data.x_out_random],
       y_true_outlier: [...data.y_out_cluster, ...data.y_out_near, ...data.y_out_random],
       x_detected_removed: splitDetected.removedX,
-      y_detected_removed: splitDetected.removedY,
-      x_circle_ref,
-      y_circle_ref,
-      x_circle_fit,
-      y_circle_fit,
-      x_true_center: xc,
-      y_true_center: yc,
-      x_est_center: x0_sel,
-      y_est_center: y0_sel
+      y_detected_removed: splitDetected.removedY
     },
     rtheta: {
       theta_original: rtOrig.theta,
       r_original: rtOrig.r,
       theta_removed: rtRemoved.theta,
       r_removed: rtRemoved.r
-    },
-    selected_result: {
-      outlier_method: params.selected_outlier,
-      fitting_method: params.selected_fitting,
-      x0: x0_sel,
-      y0: y0_sel,
-      r: r_sel,
-      r_ref: r_ref,
-      center_error: center_error_sel,
-      radius_error: radius_error_sel
     }
   };
 }
