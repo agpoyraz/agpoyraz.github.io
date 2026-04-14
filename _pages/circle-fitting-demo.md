@@ -492,7 +492,10 @@ function removeOutliersLocalZScoreProposed(x, y, threshold = 3, window_size = 60
   }
 
   const idx = Array.from(theta.keys()).sort((a, b) => theta[a] - theta[b]);
+  const theta_sorted = idx.map(i => theta[i]);
   const r_sorted = idx.map(i => r[i]);
+  const x_sorted = idx.map(i => x[i]);
+  const y_sorted = idx.map(i => y[i]);
 
   const std_list = [];
   const stride = 20;
@@ -501,37 +504,39 @@ function removeOutliersLocalZScoreProposed(x, y, threshold = 3, window_size = 60
   }
 
   const global_std = (std_list.length === 0 ? std(r_sorted) : median(std_list)) + 1e-12;
-  const mask = Array(r_sorted.length).fill(true);
 
-  if (r_sorted.length < window_size) {
-    const m = mean(r_sorted);
-    for (let i = 0; i < r_sorted.length; i++) {
-      if (Math.abs(r_sorted[i] - m) > threshold * global_std) {
-        mask[i] = false;
-      }
+  const n = r_sorted.length;
+  const mask = Array(n).fill(true);
+
+  if (n < window_size) {
+    const mean_r = mean(r_sorted);
+    const outliers = r_sorted.map(v => Math.abs(v - mean_r) > threshold * global_std);
+    for (let i = 0; i < n; i++) {
+      mask[i] = !outliers[i];
     }
   } else {
-    for (let i = 0; i <= r_sorted.length - window_size; i++) {
-      const win = r_sorted.slice(i, i + window_size);
-      const m = mean(win);
+    for (let i = 0; i <= n - window_size; i++) {
+      const window = r_sorted.slice(i, i + window_size);
+      const mean_r = mean(window);
+      const outliers = window.map(v => Math.abs(v - mean_r) > threshold * global_std);
+
       for (let j = 0; j < window_size; j++) {
-        if (Math.abs(win[j] - m) > threshold * global_std) {
-          mask[i + j] = false;
-        }
+        mask[i + j] = mask[i + j] && !outliers[j];
       }
     }
   }
 
-  const x_f = [];
-  const y_f = [];
-  for (let k = 0; k < idx.length; k++) {
-    if (mask[k]) {
-      x_f.push(x[idx[k]]);
-      y_f.push(y[idx[k]]);
+  const x_filt = [];
+  const y_filt = [];
+
+  for (let i = 0; i < n; i++) {
+    if (mask[i]) {
+      x_filt.push(x_sorted[i]);
+      y_filt.push(y_sorted[i]);
     }
   }
 
-  return { x: x_f, y: y_f };
+  return { x: x_filt, y: y_filt };
 }
 
 function fitPrattLike(x, y) {
