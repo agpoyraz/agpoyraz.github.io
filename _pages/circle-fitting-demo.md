@@ -645,6 +645,28 @@ function plotRThetaArrays(x, y) {
   };
 }
 
+function splitKeptRemoved(allX, allY, filtX, filtY) {
+  const kept = [];
+  const removed = [];
+
+  const keySet = new Set(
+    filtX.map((v, i) => `${v.toFixed(6)}_${filtY[i].toFixed(6)}`)
+  );
+
+  for (let i = 0; i < allX.length; i++) {
+    const key = `${allX[i].toFixed(6)}_${allY[i].toFixed(6)}`;
+    if (keySet.has(key)) kept.push([allX[i], allY[i]]);
+    else removed.push([allX[i], allY[i]]);
+  }
+
+  return {
+    keptX: kept.map(p => p[0]),
+    keptY: kept.map(p => p[1]),
+    removedX: removed.map(p => p[0]),
+    removedY: removed.map(p => p[1]),
+  };
+}
+  
 function currentParams() {
   return {
     sigma: parseFloat(document.getElementById('sigma').value),
@@ -668,45 +690,84 @@ function updateSliderValues() {
 }
 
 function renderScatter(scatter) {
+  const split = splitKeptRemoved(
+    scatter.x_all,
+    scatter.y_all,
+    scatter.x_filtered,
+    scatter.y_filtered
+  );
+
   const traces = [
     {
-      x: scatter.x_in, y: scatter.y_in,
-      mode: 'markers', type: 'scatter', name: 'Inlier',
+      x: scatter.x_in,
+      y: scatter.y_in,
+      mode: 'markers',
+      type: 'scatter',
+      name: 'Original Inlier',
       marker: { size: 4 }
     },
     {
-      x: scatter.x_out_cluster, y: scatter.y_out_cluster,
-      mode: 'markers', type: 'scatter', name: 'Cluster Outlier',
+      x: scatter.x_out_cluster,
+      y: scatter.y_out_cluster,
+      mode: 'markers',
+      type: 'scatter',
+      name: 'Cluster Outlier',
       marker: { size: 7, symbol: 'circle' }
     },
     {
-      x: scatter.x_out_near, y: scatter.y_out_near,
-      mode: 'markers', type: 'scatter', name: 'Near-Ellipse Outlier',
+      x: scatter.x_out_near,
+      y: scatter.y_out_near,
+      mode: 'markers',
+      type: 'scatter',
+      name: 'Near-Ellipse Outlier',
       marker: { size: 7, symbol: 'diamond' }
     },
     {
-      x: scatter.x_filtered, y: scatter.y_filtered,
-      mode: 'markers', type: 'scatter', name: 'Filtered',
-      marker: { size: 4, opacity: 0.65 }
+      x: split.keptX,
+      y: split.keptY,
+      mode: 'markers',
+      type: 'scatter',
+      name: 'Kept After Filtering',
+      marker: { size: 5, symbol: 'circle-open' }
     },
     {
-      x: scatter.x_circle_ref, y: scatter.y_circle_ref,
-      mode: 'lines', type: 'scatter', name: 'Reference Circle',
+      x: split.removedX,
+      y: split.removedY,
+      mode: 'markers',
+      type: 'scatter',
+      name: 'Removed By Filter',
+      marker: { size: 7, symbol: 'x' }
+    },
+    {
+      x: scatter.x_circle_ref,
+      y: scatter.y_circle_ref,
+      mode: 'lines',
+      type: 'scatter',
+      name: 'Reference Circle',
       line: { width: 2 }
     },
     {
-      x: scatter.x_circle_fit, y: scatter.y_circle_fit,
-      mode: 'lines', type: 'scatter', name: 'Fitted Circle',
+      x: scatter.x_circle_fit,
+      y: scatter.y_circle_fit,
+      mode: 'lines',
+      type: 'scatter',
+      name: 'Fitted Circle',
       line: { width: 3 }
     },
     {
-      x: [scatter.x_true_center], y: [scatter.y_true_center],
-      mode: 'markers', type: 'scatter', name: 'True Center',
+      x: [scatter.x_true_center],
+      y: [scatter.y_true_center],
+      mode: 'markers',
+      type: 'scatter',
+      name: 'True Center',
       marker: { size: 11, symbol: 'cross' }
     },
     {
-      x: [scatter.x_est_center], y: [scatter.y_est_center],
-      mode: 'markers', type: 'scatter', name: 'Estimated Center',
+      x: [scatter.x_est_center],
+      y: [scatter.y_est_center],
+      mode: 'markers',
+      type: 'scatter',
+      name: 'Estimated Center',
       marker: { size: 10, symbol: 'square' }
     }
   ];
@@ -716,7 +777,7 @@ function renderScatter(scatter) {
     xaxis: { title: 'x', scaleanchor: 'y' },
     yaxis: { title: 'y' },
     legend: { orientation: 'h' }
-  }, {responsive: true});
+  }, { responsive: true });
 }
 
 function renderRTheta(rtheta) {
@@ -882,6 +943,8 @@ function runExperiment(params) {
       removed: data.X.length - cleanedSelected.x.length
     },
     scatter: {
+      x_all: data.X,
+      y_all: data.Y,
       x_in: data.x_in,
       y_in: data.y_in,
       x_out_cluster: data.x_out_cluster,
