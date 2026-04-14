@@ -6,7 +6,7 @@ permalink: /publication/autofocus-edge
 date: 2022-01-01
 venue: "ISITES 2022"
 slidesurl: ''
-paperurl: '[files/ISITES2022ID7422.pdf](https://agpoyraz.github.io/files/edge_detection_autofocus.pdf)'
+paperurl: '/files/ISITES2022ID7422.pdf'
 citation: 'Poyraz, Ahmet Gökhan, and Mehmet Kaçmaz. "Edge detection based autofocus algorithm to detect accurate camera working distance." Academic Perspective Procedia 5.3 (2022): 406-416.'
 ---
 
