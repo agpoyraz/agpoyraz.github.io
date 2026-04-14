@@ -828,14 +828,27 @@ function updateSliderValues() {
 }
 
 async function initPy() {
-  setStatus('Loading Pyodide...');
+  setStatus('Loading Pyodide core...');
   pyodide = await loadPyodide();
-  setStatus('Loading numpy, scipy, pandas, and scikit-learn... First load may take some time.');
-  await pyodide.loadPackage(['numpy', 'scipy', 'pandas', 'scikit-learn']);
-  setStatus('Initializing Python functions...');
+
+  setStatus('Loading numpy...');
+  await pyodide.loadPackage(['numpy']);
+
+  setStatus('Loading scipy...');
+  await pyodide.loadPackage(['scipy']);
+
+  setStatus('Loading pandas...');
+  await pyodide.loadPackage(['pandas']);
+
+  setStatus('Loading scikit-learn (this is slow)...');
+  await pyodide.loadPackage(['scikit-learn']);
+
+  setStatus('Initializing Python code...');
   await pyodide.runPythonAsync(pythonSource);
+
   pyReady = true;
   setStatus('Ready.');
+
   await runDemo();
 }
 
