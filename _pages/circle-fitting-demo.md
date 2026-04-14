@@ -52,9 +52,7 @@ author_profile: true
     margin-top: 8px;
     min-height: 24px;
   }
-  .cf-table-wrap {
-    overflow-x: auto;
-  }
+  .cf-table-wrap { overflow-x: auto; }
   .cf-table {
     width: 100%;
     border-collapse: collapse;
@@ -74,7 +72,9 @@ author_profile: true
 </style>
 
 <div class="cf-note">
-  This page runs the circle fitting outlier demo directly in the browser with <strong>Pyodide</strong>. The synthetic data generation and analysis logic follows the uploaded Python implementation. The user-adjustable variables are <code>sigma</code>, <code>n_points</code>, <code>a</code>, and <code>b</code>. The cluster outlier count is fixed as <code>int(n_points * 0.02)</code>.
+  This page runs directly in JavaScript for speed. Adjustable variables are
+  <code>sigma</code>, <code>n_points</code>, <code>a</code>, and <code>b</code>.
+  The cluster outlier count is fixed as <code>int(n_points * 0.02)</code>.
 </div>
 
 <div class="cf-grid">
@@ -110,8 +110,6 @@ author_profile: true
         <option>Proposed Local Z-Score</option>
         <option>Z-Score</option>
         <option>MAD</option>
-        <option>DBSCAN</option>
-        <option>LOF</option>
         <option>Percentile</option>
       </select>
     </div>
@@ -124,12 +122,6 @@ author_profile: true
         <option>Taubin</option>
         <option>RANSAC</option>
         <option>IRLS</option>
-        <option>Hyper LS</option>
-        <option>M-Estimator</option>
-        <option>LMedS</option>
-        <option>TLS</option>
-        <option>Bayesian</option>
-        <option>Gradient Descent</option>
         <option>EDCircle</option>
       </select>
     </div>
@@ -146,7 +138,7 @@ author_profile: true
       random_seed = 42
     </div>
 
-    <div class="cf-status" id="status_box">Loading Python runtime...</div>
+    <div class="cf-status" id="status_box">Ready.</div>
 
     <div class="cf-box" id="result_box">
       Results will appear here.
@@ -157,7 +149,7 @@ author_profile: true
     <div class="cf-plot"><div id="plot_scatter" style="width:100%;height:760px;"></div></div>
     <div class="cf-plot"><div id="plot_rtheta" style="width:100%;height:420px;"></div></div>
     <div class="cf-box">
-      <h3 style="margin-top:0;">Top 10 Results</h3>
+      <h3 style="margin-top:0;">Top Results</h3>
       <div class="cf-table-wrap">
         <table class="cf-table" id="results_table">
           <thead>
@@ -181,675 +173,476 @@ author_profile: true
 </div>
 
 <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
-<script src="https://cdn.jsdelivr.net/pyodide/v0.27.2/full/pyodide.js"></script>
 
 <script>
-let pyodide = null;
-let pyReady = false;
-
-const pythonSource = `
-import json
-import random
-import numpy as np
-from scipy.optimize import least_squares
-from sklearn.cluster import DBSCAN
-from sklearn.neighbors import LocalOutlierFactor
-from sklearn.preprocessing import StandardScaler
-
-
-def generate_synthetic_ellipse(
-    xc=100,
-    yc=80,
-    a=50,
-    b=50,
-    n_points=200,
-    sigma=0.8,
-    cluster_outliers=10,
-    near_ellipse_outliers=10,
-    random_outliers=10,
-    random_seed=None
-):
-    if random_seed is not None:
-        np.random.seed(random_seed)
-        random.seed(random_seed)
-
-    theta = np.linspace(0, 2 * np.pi, n_points, endpoint=False)
-    x = xc + a * np.cos(theta)
-    y = yc + b * np.sin(theta)
-
-    x_in = x + sigma * np.random.randn(len(x))
-    y_in = y + sigma * np.random.randn(len(y))
-
-    if cluster_outliers > 0:
-        x_out_cluster = (xc + a + 5) + 1 * np.random.randn(cluster_outliers)
-        y_out_cluster = yc + 1 * np.random.randn(cluster_outliers)
-    else:
-        x_out_cluster = np.array([])
-        y_out_cluster = np.array([])
-
-    if near_ellipse_outliers > 0:
-        theta_o = 2 * np.pi * np.random.rand(near_ellipse_outliers)
-        scale = 1 + 0.01 * np.random.randn(near_ellipse_outliers)
-        x_out_near = xc + scale * a * np.cos(theta_o)
-        y_out_near = yc + scale * b * np.sin(theta_o)
-    else:
-        x_out_near = np.array([])
-        y_out_near = np.array([])
-
-    if random_outliers > 0:
-        span = 1.5 * max(a, b) * 2
-        x_out_random = (xc - span) + (2 * span) * np.random.rand(random_outliers)
-        y_out_random = (yc - span) + (2 * span) * np.random.rand(random_outliers)
-    else:
-        x_out_random = np.array([])
-        y_out_random = np.array([])
-
-    x_out = np.concatenate([x_out_cluster, x_out_near, x_out_random])
-    y_out = np.concatenate([y_out_cluster, y_out_near, y_out_random])
-
-    X = np.concatenate([x_in, x_out])
-    Y = np.concatenate([y_in, y_out])
-
-    labels = np.concatenate([
-        np.zeros(len(x_in), dtype=int),
-        np.ones(len(x_out_cluster), dtype=int),
-        2 * np.ones(len(x_out_near), dtype=int),
-        3 * np.ones(len(x_out_random), dtype=int)
-    ])
-
-    idx = np.random.permutation(len(X))
-    X = X[idx]
-    Y = Y[idx]
-    labels = labels[idx]
-
-    return (
-        x_in, y_in,
-        x_out_cluster, y_out_cluster,
-        x_out_near, y_out_near,
-        x_out_random, y_out_random,
-        X, Y, labels
-    )
-
-
-def remove_outliers_local_zscore_proposed(x, y, threshold=3, window_size=60, std_window=60):
-    x = np.asarray(x).flatten()
-    y = np.asarray(y).flatten()
-
-    xc = np.mean(x)
-    yc = np.mean(y)
-
-    theta = np.arctan2(y - yc, x - xc)
-    r = np.sqrt((x - xc)**2 + (y - yc)**2)
-
-    idx = np.argsort(theta)
-    theta_sorted = theta[idx]
-    r_sorted = r[idx]
-
-    std_list = []
-    stride = 20
-    for i in range(0, len(r_sorted) - std_window + 1, stride):
-        std_list.append(np.std(r_sorted[i:i + std_window]))
-
-    if len(std_list) == 0:
-        global_std = np.std(r_sorted) + 1e-12
-    else:
-        global_std = np.median(std_list) + 1e-12
-
-    n = len(r_sorted)
-    mask = np.ones(n, dtype=bool)
-
-    if n < window_size:
-        mean_r = np.mean(r_sorted)
-        outliers = np.abs(r_sorted - mean_r) > threshold * global_std
-        mask = ~outliers
-    else:
-        for i in range(n - window_size + 1):
-            window = r_sorted[i:i + window_size]
-            mean_r = np.mean(window)
-            outliers = np.abs(window - mean_r) > threshold * global_std
-            mask[i:i + window_size] &= ~outliers
-
-    r_clean = r_sorted[mask]
-    theta_clean = theta_sorted[mask]
-
-    x_filt = r_clean * np.cos(theta_clean) + xc
-    y_filt = r_clean * np.sin(theta_clean) + yc
-
-    return x_filt, y_filt
-
-
-def remove_outliers_zscore(x, y, threshold=3.0):
-    x = np.asarray(x)
-    y = np.asarray(y)
-
-    r = np.sqrt((x - np.mean(x))**2 + (y - np.mean(y))**2)
-    std_r = np.std(r)
-
-    if std_r < 1e-12:
-        return x, y
-
-    z = (r - np.mean(r)) / std_r
-    mask = np.abs(z) < threshold
-    return x[mask], y[mask]
-
-
-def remove_outliers_mad(x, y, threshold=3.5):
-    x = np.asarray(x)
-    y = np.asarray(y)
-
-    r = np.sqrt((x - np.median(x))**2 + (y - np.median(y))**2)
-    med_r = np.median(r)
-    mad = np.median(np.abs(r - med_r))
-
-    if mad < 1e-12:
-        return x, y
-
-    mask = np.abs(r - med_r) / mad < threshold
-    return x[mask], y[mask]
-
-
-def remove_outliers_dbscan(x, y, eps=0.3, min_samples=5):
-    x = np.asarray(x)
-    y = np.asarray(y)
-
-    coords = np.column_stack((x, y))
-    coords_scaled = StandardScaler().fit_transform(coords)
-
-    db = DBSCAN(eps=eps, min_samples=min_samples).fit(coords_scaled)
-    mask = db.labels_ != -1
-    return x[mask], y[mask]
-
-
-def remove_outliers_lof(x, y, n_neighbors=20):
-    x = np.asarray(x)
-    y = np.asarray(y)
-
-    coords = np.column_stack((x, y))
-
-    if len(x) < n_neighbors:
-        return x, y
-
-    lof = LocalOutlierFactor(n_neighbors=n_neighbors)
-    mask = lof.fit_predict(coords) == 1
-    return x[mask], y[mask]
-
-
-def remove_outliers_percentile(x, y, lower=2.275, upper=97.725):
-    x = np.asarray(x)
-    y = np.asarray(y)
-
-    r = np.sqrt((x - np.mean(x))**2 + (y - np.mean(y))**2)
-    low, high = np.percentile(r, [lower, upper])
-    mask = (r >= low) & (r <= high)
-    return x[mask], y[mask]
-
-
-# --- Fitting Yöntemleri ---
-
-def fit_geometric_ls(x, y):
-    def residuals(c, x, y):
-        Ri = np.sqrt((x - c[0])**2 + (y - c[1])**2)
-        return Ri - Ri.mean()
-    x_m = np.mean(x)
-    y_m = np.mean(y)
-    result = least_squares(residuals, x0=[x_m, y_m], args=(x, y))
-    x0, y0 = result.x
-    r = np.mean(np.sqrt((x - x0)**2 + (y - y0)**2))
-    return x0, y0, r
-
-
-def fit_pratt(x, y):
-    x = np.array(x)
-    y = np.array(y)
-    x_m = np.mean(x)
-    y_m = np.mean(y)
-    u = x - x_m
-    v = y - y_m
-    Suu = np.sum(u**2)
-    Suv = np.sum(u*v)
-    Svv = np.sum(v**2)
-    Suuu = np.sum(u**3)
-    Suvv = np.sum(u*v**2)
-    Svvv = np.sum(v**3)
-    Svuu = np.sum(v*u**2)
-    A = np.array([[Suu, Suv], [Suv, Svv]])
-    b = np.array([0.5 * (Suuu + Suvv), 0.5 * (Svvv + Svuu)])
-    uc, vc = np.linalg.solve(A, b)
-    x0 = x_m + uc
-    y0 = y_m + vc
-    r = np.mean(np.sqrt((x - x0)**2 + (y - y0)**2))
-    return x0, y0, r
-
-
-def fit_taubin(x, y):
-    x = np.array(x)
-    y = np.array(y)
-    x_m = np.mean(x)
-    y_m = np.mean(y)
-    u = x - x_m
-    v = y - y_m
-    Suu = np.sum(u**2)
-    Suv = np.sum(u*v)
-    Svv = np.sum(v**2)
-    Suuu = np.sum(u**3)
-    Suvv = np.sum(u*v**2)
-    Svvv = np.sum(v**3)
-    Svuu = np.sum(v*u**2)
-    A = np.array([[Suu, Suv], [Suv, Svv]])
-    B = np.array([Suuu + Suvv, Svvv + Svuu]) / 2
-    uc, vc = np.linalg.solve(A, B)
-    x0 = x_m + uc
-    y0 = y_m + vc
-    r = np.sqrt(uc**2 + vc**2 + (Suu + Svv) / len(x))
-    return x0, y0, r
-
-
-def fit_ransac(x, y, iterations=100, threshold=2.0):
-    best_inliers = []
-    best_circle = (0, 0, 0)
-    x = np.array(x)
-    y = np.array(y)
-    points = np.stack([x, y], axis=1)
-
-    for _ in range(iterations):
-        samples = points[random.sample(range(len(points)), 3)]
-        try:
-            A = np.c_[2*samples[:,0], 2*samples[:,1], np.ones(3)]
-            b = samples[:,0]**2 + samples[:,1]**2
-            c = np.linalg.lstsq(A, b, rcond=None)[0]
-            xc, yc = c[0], c[1]
-            r = np.sqrt(c[2] + xc**2 + yc**2)
-            d = np.sqrt((x - xc)**2 + (y - yc)**2)
-            inliers = d[np.abs(d - r) < threshold]
-            if len(inliers) > len(best_inliers):
-                best_inliers = inliers
-                best_circle = (xc, yc, r)
-        except:
-            continue
-    return best_circle
-
-
-def fit_irls(x, y, iterations=10):
-    x = np.array(x)
-    y = np.array(y)
-    weights = np.ones_like(x)
-    for _ in range(iterations):
-        A = np.c_[2*x, 2*y, np.ones(x.shape[0])]
-        b = x**2 + y**2
-        W = np.diag(weights)
-        Aw = W @ A
-        bw = W @ b
-        c = np.linalg.lstsq(Aw, bw, rcond=None)[0]
-        x0, y0 = c[0], c[1]
-        r = np.sqrt(c[2] + x0**2 + y0**2)
-        d = np.sqrt((x - x0)**2 + (y - y0)**2)
-        weights = 1.0 / np.maximum(np.abs(d - r), 1e-6)
-        weights /= np.max(weights)
-    return x0, y0, r
-
-
-def fit_hyper_ls(x, y):
-    x = np.array(x)
-    y = np.array(y)
-    D = np.column_stack((x * x + y * y, x, y, np.ones_like(x)))
-    S = np.dot(D.T, D)
-    C = np.zeros((4, 4))
-    C[0, 3] = C[3, 0] = 2
-    C[1, 1] = C[2, 2] = 1
-
-    try:
-        eigvals, eigvecs = np.linalg.eig(np.linalg.inv(S) @ C)
-        cond = np.isreal(eigvals)
-        eigvec = eigvecs[:, cond][:, 0].real
-        A, B, C_, D_ = eigvec
-        x0 = -B / (2 * A)
-        y0 = -C_ / (2 * A)
-        r = np.sqrt((B**2 + C_**2 - 4 * A * D_) / (4 * A**2))
-    except:
-        x0, y0, r = 0, 0, 0
-
-    return x0, y0, r
-
-
-def fit_m_estimator(x, y, iterations=10, delta=1.0):
-    x = np.array(x)
-    y = np.array(y)
-    weights = np.ones_like(x)
-    for _ in range(iterations):
-        A = np.c_[2*x, 2*y, np.ones_like(x)]
-        b = x**2 + y**2
-        W = np.diag(weights)
-        try:
-            c = np.linalg.lstsq(W @ A, W @ b, rcond=None)[0]
-        except:
-            break
-        x0, y0 = c[0], c[1]
-        r = np.sqrt(c[2] + x0**2 + y0**2)
-        d = np.sqrt((x - x0)**2 + (y - y0)**2)
-        res = np.abs(d - r)
-        weights = np.where(res <= delta, 1, delta / res)
-    return x0, y0, r
-
-
-def fit_lmeds(x, y):
-    x = np.array(x)
-    y = np.array(y)
-    points = np.stack([x, y], axis=1)
-    best_median = np.inf
-    best_circle = (0, 0, 0)
-
-    for _ in range(100):
-        sample = points[random.sample(range(len(points)), 3)]
-        try:
-            A = np.c_[2*sample[:, 0], 2*sample[:, 1], np.ones(3)]
-            b = sample[:, 0]**2 + sample[:, 1]**2
-            c = np.linalg.lstsq(A, b, rcond=None)[0]
-            xc, yc = c[0], c[1]
-            r = np.sqrt(c[2] + xc**2 + yc**2)
-            d = np.sqrt((x - xc)**2 + (y - yc)**2)
-            residuals = np.abs(d - r)
-            median_residual = np.median(residuals)
-            if median_residual < best_median:
-                best_median = median_residual
-                best_circle = (xc, yc, r)
-        except:
-            continue
-
-    return best_circle
-
-
-def fit_tls(x, y):
-    x = np.asarray(x, dtype=float)
-    y = np.asarray(y, dtype=float)
-
-    A = np.c_[2 * x, 2 * y, np.ones_like(x)]
-    b = x**2 + y**2
-    M = np.column_stack((A, b))
-
-    _, _, Vt = np.linalg.svd(M)
-    v = Vt[-1, :]
-
-    if abs(v[3]) < 1e-12:
-        raise ValueError("TLS çözümü kararsız: v[3] çok küçük.")
-
-    p = -v[:3] / v[3]
-
-    x0 = p[0]
-    y0 = p[1]
-    c0 = p[2]
-
-    radicand = c0 + x0**2 + y0**2
-    if radicand < 0:
-        raise ValueError("Negatif yarıçap karesi oluştu.")
-
-    r = np.sqrt(radicand)
-    return x0, y0, r
-
-
-def fit_bayesian(x, y):
-    x = np.array(x)
-    y = np.array(y)
-    x0 = np.mean(x)
-    y0 = np.mean(y)
-    r = np.mean(np.sqrt((x - x0)**2 + (y - y0)**2))
-    noise = np.random.normal(0, 0.5, 100)
-    r_samples = r + noise
-    r_mean = np.mean(r_samples)
-    return x0, y0, r_mean
-
-
-def fit_gradient_descent(x, y, lr=1e-3, iterations=1000):
-    x = np.array(x)
-    y = np.array(y)
-    x0, y0 = np.mean(x), np.mean(y)
-    r = np.mean(np.sqrt((x - x0)**2 + (y - y0)**2))
-
-    for _ in range(iterations):
-        d = np.sqrt((x - x0)**2 + (y - y0)**2)
-        dr = d - r
-        dx0 = np.mean((x0 - x) * dr / d)
-        dy0 = np.mean((y0 - y) * dr / d)
-        dr0 = -np.mean(dr)
-        x0 -= lr * dx0
-        y0 -= lr * dy0
-        r -= lr * dr0
-
-    return x0, y0, r
-
-
-def fit_edcircle(x, y):
-    x = np.array(x)
-    y = np.array(y)
-    A = np.column_stack((x, y, np.ones_like(x)))
-    b = -(x**2 + y**2)
-    c = np.linalg.lstsq(A, b, rcond=None)[0]
-    D, E, F = c
-    x0 = -D / 2
-    y0 = -E / 2
-    r = np.sqrt((D**2 + E**2) / 4 - F)
-    return x0, y0, r
-
-
-def plot_r_theta_arrays(x, y):
-    x = np.asarray(x).flatten()
-    y = np.asarray(y).flatten()
-    xc = np.mean(x)
-    yc = np.mean(y)
-    theta = np.arctan2(y - yc, x - xc)
-    r = np.sqrt((x - xc)**2 + (y - yc)**2)
-    idx = np.argsort(theta)
-    return theta[idx], r[idx]
-
-
-def run_experiment(params_json):
-    params = json.loads(params_json)
-
-    xc = 500
-    yc = 500
-    a = float(params['a'])
-    b = float(params['b'])
-    n_points = int(params['n_points'])
-    sigma = float(params['sigma'])
-    selected_outlier = params['selected_outlier']
-    selected_fitting = params['selected_fitting']
-
-    cluster_outliers = int(n_points * 0.02)
-    near_ellipse_outliers = int(n_points * 0.02)
-    random_outliers = 0
-    random_seed = 42
-
-    (
-        x_in, y_in,
-        x_out_cluster, y_out_cluster,
-        x_out_near, y_out_near,
-        x_out_random, y_out_random,
-        X, Y, labels
-    ) = generate_synthetic_ellipse(
-        xc=xc,
-        yc=yc,
-        a=a,
-        b=b,
-        n_points=n_points,
-        sigma=sigma,
-        cluster_outliers=cluster_outliers,
-        near_ellipse_outliers=near_ellipse_outliers,
-        random_outliers=random_outliers,
-        random_seed=random_seed
-    )
-
-    r_ref = (a + b) / 2.0
-
-    outlier_methods = {
-        "None": lambda x, y: (x, y),
-        "Proposed Local Z-Score": lambda x, y: remove_outliers_local_zscore_proposed(x, y, threshold=3, window_size=60, std_window=60),
-        "Z-Score": lambda x, y: remove_outliers_zscore(x, y, threshold=3.0),
-        "MAD": lambda x, y: remove_outliers_mad(x, y, threshold=3),
-        "DBSCAN": lambda x, y: remove_outliers_dbscan(x, y, eps=0.3, min_samples=5),
-        "LOF": lambda x, y: remove_outliers_lof(x, y, n_neighbors=20),
-        "Percentile": lambda x, y: remove_outliers_percentile(x, y, lower=2.275, upper=97.725),
-    }
-
-    fitting_methods = {
-        "Geometric LS": fit_geometric_ls,
-        "Pratt": fit_pratt,
-        "Taubin": fit_taubin,
-        "RANSAC": fit_ransac,
-        "IRLS": fit_irls,
-        "Hyper LS": fit_hyper_ls,
-        "M-Estimator": fit_m_estimator,
-        "LMedS": fit_lmeds,
-        "TLS": fit_tls,
-        "Bayesian": fit_bayesian,
-        "Gradient Descent": fit_gradient_descent,
-        "EDCircle": fit_edcircle,
-    }
-
-    all_results = []
-
-    for out_name, out_func in outlier_methods.items():
-        try:
-            x_clean, y_clean = out_func(X, Y)
-        except Exception:
-            continue
-
-        removed_count = len(X) - len(x_clean)
-
-        if len(x_clean) < 3:
-            continue
-
-        for fit_name, fit_func in fitting_methods.items():
-            try:
-                x0, y0, r = fit_func(x_clean, y_clean)
-                if not (np.isfinite(x0) and np.isfinite(y0) and np.isfinite(r)):
-                    continue
-                center_error = np.sqrt((x0 - xc) ** 2 + (y0 - yc) ** 2)
-                radius_error = abs(r - r_ref)
-                all_results.append({
-                    "outlier_method": out_name,
-                    "fitting_method": fit_name,
-                    "n_remaining": int(len(x_clean)),
-                    "n_removed": int(removed_count),
-                    "x0": float(x0),
-                    "y0": float(y0),
-                    "r": float(r),
-                    "center_error": float(center_error),
-                    "radius_error": float(radius_error)
-                })
-            except Exception:
-                continue
-
-    all_results_sorted = sorted(all_results, key=lambda d: (d["radius_error"], d["center_error"]))
-
-    x_sel, y_sel = outlier_methods[selected_outlier](X, Y)
-    x0_sel, y0_sel, r_sel = fitting_methods[selected_fitting](x_sel, y_sel)
-    center_error_sel = float(np.sqrt((x0_sel - xc) ** 2 + (y0_sel - yc) ** 2))
-    radius_error_sel = float(abs(r_sel - r_ref))
-
-    theta_orig, r_orig = plot_r_theta_arrays(X, Y)
-    theta_filt, r_filt = plot_r_theta_arrays(x_sel, y_sel)
-
-    th = np.linspace(0, 2 * np.pi, 400)
-    x_circle_ref = xc + r_ref * np.cos(th)
-    y_circle_ref = yc + r_ref * np.sin(th)
-    x_circle_fit = x0_sel + r_sel * np.cos(th)
-    y_circle_fit = y0_sel + r_sel * np.sin(th)
-
-    result = {
-        "params": {
-            "sigma": sigma,
-            "n_points": n_points,
-            "a": a,
-            "b": b,
-            "cluster_outliers": int(cluster_outliers),
-            "near_ellipse_outliers": int(near_ellipse_outliers),
-            "random_outliers": int(random_outliers),
-            "random_seed": int(random_seed)
-        },
-        "counts": {
-            "inlier": int(len(x_in)),
-            "cluster_outlier": int(len(x_out_cluster)),
-            "near_outlier": int(len(x_out_near)),
-            "random_outlier": int(len(x_out_random)),
-            "total": int(len(X)),
-            "remaining": int(len(x_sel)),
-            "removed": int(len(X) - len(x_sel))
-        },
-        "scatter": {
-            "x_in": x_in.tolist(),
-            "y_in": y_in.tolist(),
-            "x_out_cluster": x_out_cluster.tolist(),
-            "y_out_cluster": y_out_cluster.tolist(),
-            "x_out_near": x_out_near.tolist(),
-            "y_out_near": y_out_near.tolist(),
-            "x_out_random": x_out_random.tolist(),
-            "y_out_random": y_out_random.tolist(),
-            "x_filtered": np.asarray(x_sel).tolist(),
-            "y_filtered": np.asarray(y_sel).tolist(),
-            "x_circle_ref": x_circle_ref.tolist(),
-            "y_circle_ref": y_circle_ref.tolist(),
-            "x_circle_fit": x_circle_fit.tolist(),
-            "y_circle_fit": y_circle_fit.tolist(),
-            "x_true_center": [float(xc)],
-            "y_true_center": [float(yc)],
-            "x_est_center": [float(x0_sel)],
-            "y_est_center": [float(y0_sel)]
-        },
-        "rtheta": {
-            "theta_original": theta_orig.tolist(),
-            "r_original": r_orig.tolist(),
-            "theta_filtered": theta_filt.tolist(),
-            "r_filtered": r_filt.tolist()
-        },
-        "selected_result": {
-            "outlier_method": selected_outlier,
-            "fitting_method": selected_fitting,
-            "x0": float(x0_sel),
-            "y0": float(y0_sel),
-            "r": float(r_sel),
-            "r_ref": float(r_ref),
-            "center_error": center_error_sel,
-            "radius_error": radius_error_sel
-        },
-        "top10": all_results_sorted[:10]
-    }
-
-    return json.dumps(result)
-`;
-
-function setStatus(msg) {
-  document.getElementById('status_box').textContent = msg;
+function mulberry32(a) {
+  return function() {
+    let t = a += 0x6D2B79F5;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  }
 }
 
-function updateSliderValues() {
-  document.getElementById('sigma_val').textContent = document.getElementById('sigma').value;
-  document.getElementById('n_points_val').textContent = document.getElementById('n_points').value;
-  document.getElementById('a_val').textContent = document.getElementById('a').value;
-  document.getElementById('b_val').textContent = document.getElementById('b').value;
+function randn(rng) {
+  let u = 0, v = 0;
+  while (u === 0) u = rng();
+  while (v === 0) v = rng();
+  return Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
 }
 
-async function initPy() {
-  setStatus('Loading Pyodide core...');
-  pyodide = await loadPyodide();
+function mean(arr) {
+  return arr.reduce((a,b) => a+b, 0) / arr.length;
+}
 
-  setStatus('Loading numpy...');
-  await pyodide.loadPackage(['numpy']);
+function median(arr) {
+  const s = [...arr].sort((a,b) => a-b);
+  const n = s.length;
+  return n % 2 ? s[(n-1)/2] : 0.5*(s[n/2 - 1] + s[n/2]);
+}
 
-  setStatus('Loading scipy...');
-  await pyodide.loadPackage(['scipy']);
+function std(arr) {
+  const m = mean(arr);
+  return Math.sqrt(mean(arr.map(v => (v - m) * (v - m))));
+}
 
-  setStatus('Loading pandas...');
-  await pyodide.loadPackage(['pandas']);
+function percentile(arr, p) {
+  const s = [...arr].sort((a,b) => a-b);
+  const idx = (p / 100) * (s.length - 1);
+  const lo = Math.floor(idx);
+  const hi = Math.ceil(idx);
+  if (lo === hi) return s[lo];
+  return s[lo] + (idx - lo) * (s[hi] - s[lo]);
+}
 
-  setStatus('Loading scikit-learn (this is slow)...');
-  await pyodide.loadPackage(['scikit-learn']);
+function linspace(start, end, n, endpoint=true) {
+  const arr = [];
+  const step = endpoint ? (end - start) / (n - 1) : (end - start) / n;
+  for (let i = 0; i < n; i++) arr.push(start + i * step);
+  return arr;
+}
 
-  setStatus('Initializing Python code...');
-  await pyodide.runPythonAsync(pythonSource);
+function shuffleTogether(arrs, rng) {
+  const n = arrs[0].length;
+  for (let i = n - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    for (const arr of arrs) {
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+  }
+}
 
-  pyReady = true;
-  setStatus('Ready.');
+function solve3x3(A, b) {
+  const M = A.map((row, i) => [...row, b[i]]);
+  for (let i = 0; i < 3; i++) {
+    let maxRow = i;
+    for (let k = i + 1; k < 3; k++) {
+      if (Math.abs(M[k][i]) > Math.abs(M[maxRow][i])) maxRow = k;
+    }
+    [M[i], M[maxRow]] = [M[maxRow], M[i]];
+    const piv = M[i][i];
+    if (Math.abs(piv) < 1e-12) throw new Error("Singular matrix");
+    for (let j = i; j < 4; j++) M[i][j] /= piv;
+    for (let k = 0; k < 3; k++) {
+      if (k !== i) {
+        const factor = M[k][i];
+        for (let j = i; j < 4; j++) M[k][j] -= factor * M[i][j];
+      }
+    }
+  }
+  return [M[0][3], M[1][3], M[2][3]];
+}
 
-  await runDemo();
+function solve2x2(A, b) {
+  const det = A[0][0]*A[1][1] - A[0][1]*A[1][0];
+  if (Math.abs(det) < 1e-12) throw new Error("Singular 2x2");
+  const x = (b[0]*A[1][1] - b[1]*A[0][1]) / det;
+  const y = (A[0][0]*b[1] - A[1][0]*b[0]) / det;
+  return [x, y];
+}
+
+function circleFrom3Points(x1,y1,x2,y2,x3,y3) {
+  const A = [
+    [2*x1, 2*y1, 1],
+    [2*x2, 2*y2, 1],
+    [2*x3, 2*y3, 1]
+  ];
+  const b = [
+    x1*x1 + y1*y1,
+    x2*x2 + y2*y2,
+    x3*x3 + y3*y3
+  ];
+  const c = solve3x3(A, b);
+  const xc = c[0], yc = c[1];
+  const r2 = c[2] + xc*xc + yc*yc;
+  if (r2 <= 0) throw new Error("Invalid radius");
+  return [xc, yc, Math.sqrt(r2)];
+}
+
+function generateSyntheticEllipse({
+  xc=500, yc=500, a=675, b=685, n_points=1000, sigma=0.8,
+  cluster_outliers=20, near_ellipse_outliers=20, random_outliers=0, random_seed=42
+}) {
+  const rng = mulberry32(random_seed);
+
+  const theta = linspace(0, 2*Math.PI, n_points, false);
+  const x = theta.map(t => xc + a * Math.cos(t));
+  const y = theta.map(t => yc + b * Math.sin(t));
+
+  const x_in = x.map(v => v + sigma * randn(rng));
+  const y_in = y.map(v => v + sigma * randn(rng));
+
+  const x_out_cluster = [];
+  const y_out_cluster = [];
+  for (let i = 0; i < cluster_outliers; i++) {
+    x_out_cluster.push((xc + a + 5) + randn(rng));
+    y_out_cluster.push(yc + randn(rng));
+  }
+
+  const x_out_near = [];
+  const y_out_near = [];
+  for (let i = 0; i < near_ellipse_outliers; i++) {
+    const t = 2 * Math.PI * rng();
+    const scale = 1 + 0.01 * randn(rng);
+    x_out_near.push(xc + scale * a * Math.cos(t));
+    y_out_near.push(yc + scale * b * Math.sin(t));
+  }
+
+  const x_out_random = [];
+  const y_out_random = [];
+  const span = 1.5 * Math.max(a,b) * 2;
+  for (let i = 0; i < random_outliers; i++) {
+    x_out_random.push((xc - span) + (2 * span) * rng());
+    y_out_random.push((yc - span) + (2 * span) * rng());
+  }
+
+  const X = [...x_in, ...x_out_cluster, ...x_out_near, ...x_out_random];
+  const Y = [...y_in, ...y_out_cluster, ...y_out_near, ...y_out_random];
+  const labels = [
+    ...Array(x_in.length).fill(0),
+    ...Array(x_out_cluster.length).fill(1),
+    ...Array(x_out_near.length).fill(2),
+    ...Array(x_out_random.length).fill(3)
+  ];
+
+  shuffleTogether([X, Y, labels], rng);
+
+  return {
+    x_in, y_in,
+    x_out_cluster, y_out_cluster,
+    x_out_near, y_out_near,
+    x_out_random, y_out_random,
+    X, Y, labels
+  };
+}
+
+function computeRadiusFromCenter(x, y, xc, yc) {
+  const r = [];
+  for (let i = 0; i < x.length; i++) {
+    const dx = x[i] - xc;
+    const dy = y[i] - yc;
+    r.push(Math.sqrt(dx*dx + dy*dy));
+  }
+  return r;
+}
+
+function removeOutliersNone(x, y) {
+  return {x:[...x], y:[...y]};
+}
+
+function removeOutliersZScore(x, y, threshold=3.0) {
+  const xm = mean(x), ym = mean(y);
+  const r = computeRadiusFromCenter(x, y, xm, ym);
+  const mr = mean(r), sr = std(r);
+  if (sr < 1e-12) return {x:[...x], y:[...y]};
+  const keep = r.map(v => Math.abs((v - mr) / sr) < threshold);
+  return {
+    x: x.filter((_, i) => keep[i]),
+    y: y.filter((_, i) => keep[i])
+  };
+}
+
+function removeOutliersMAD(x, y, threshold=3.5) {
+  const xm = median(x), ym = median(y);
+  const r = computeRadiusFromCenter(x, y, xm, ym);
+  const mr = median(r);
+  const mad = median(r.map(v => Math.abs(v - mr)));
+  if (mad < 1e-12) return {x:[...x], y:[...y]};
+  const keep = r.map(v => Math.abs(v - mr) / mad < threshold);
+  return {
+    x: x.filter((_, i) => keep[i]),
+    y: y.filter((_, i) => keep[i])
+  };
+}
+
+function removeOutliersPercentile(x, y, lower=2.275, upper=97.725) {
+  const xm = mean(x), ym = mean(y);
+  const r = computeRadiusFromCenter(x, y, xm, ym);
+  const low = percentile(r, lower);
+  const high = percentile(r, upper);
+  const keep = r.map(v => v >= low && v <= high);
+  return {
+    x: x.filter((_, i) => keep[i]),
+    y: y.filter((_, i) => keep[i])
+  };
+}
+
+function removeOutliersLocalZScoreProposed(x, y, threshold=3, window_size=60, std_window=60) {
+  const xc = mean(x), yc = mean(y);
+  const theta = [];
+  const r = [];
+  for (let i = 0; i < x.length; i++) {
+    theta.push(Math.atan2(y[i] - yc, x[i] - xc));
+    const dx = x[i] - xc;
+    const dy = y[i] - yc;
+    r.push(Math.sqrt(dx*dx + dy*dy));
+  }
+
+  const idx = Array.from(theta.keys()).sort((a,b) => theta[a] - theta[b]);
+  const theta_sorted = idx.map(i => theta[i]);
+  const r_sorted = idx.map(i => r[i]);
+
+  const std_list = [];
+  const stride = 20;
+  for (let i = 0; i <= r_sorted.length - std_window; i += stride) {
+    std_list.push(std(r_sorted.slice(i, i + std_window)));
+  }
+
+  const global_std = (std_list.length === 0 ? std(r_sorted) : median(std_list)) + 1e-12;
+  const mask = Array(r_sorted.length).fill(true);
+
+  if (r_sorted.length < window_size) {
+    const m = mean(r_sorted);
+    for (let i = 0; i < r_sorted.length; i++) {
+      if (Math.abs(r_sorted[i] - m) > threshold * global_std) mask[i] = false;
+    }
+  } else {
+    for (let i = 0; i <= r_sorted.length - window_size; i++) {
+      const win = r_sorted.slice(i, i + window_size);
+      const m = mean(win);
+      for (let j = 0; j < window_size; j++) {
+        if (Math.abs(win[j] - m) > threshold * global_std) {
+          mask[i + j] = false;
+        }
+      }
+    }
+  }
+
+  const x_f = [], y_f = [];
+  for (let i = 0; i < mask.length; i++) {
+    if (mask[i]) {
+      x_f.push(r_sorted[i] * Math.cos(theta_sorted[i]) + xc);
+      y_f.push(r_sorted[i] * Math.sin(theta_sorted[i]) + yc);
+    }
+  }
+  return {x: x_f, y: y_f};
+}
+
+function fitPrattLike(x, y) {
+  const xm = mean(x), ym = mean(y);
+  const u = x.map(v => v - xm);
+  const v = y.map(vv => vv - ym);
+
+  let Suu=0, Suv=0, Svv=0, Suuu=0, Suvv=0, Svvv=0, Svuu=0;
+  for (let i = 0; i < x.length; i++) {
+    Suu += u[i]*u[i];
+    Suv += u[i]*v[i];
+    Svv += v[i]*v[i];
+    Suuu += u[i]*u[i]*u[i];
+    Suvv += u[i]*v[i]*v[i];
+    Svvv += v[i]*v[i]*v[i];
+    Svuu += v[i]*u[i]*u[i];
+  }
+
+  const A = [[Suu, Suv], [Suv, Svv]];
+  const b = [0.5*(Suuu + Suvv), 0.5*(Svvv + Svuu)];
+  const [uc, vc] = solve2x2(A, b);
+  const xc = xm + uc;
+  const yc = ym + vc;
+  const r = mean(computeRadiusFromCenter(x, y, xc, yc));
+  return [xc, yc, r];
+}
+
+function fitTaubin(x, y) {
+  const xm = mean(x), ym = mean(y);
+  const u = x.map(v => v - xm);
+  const v = y.map(vv => vv - ym);
+
+  let Suu=0, Suv=0, Svv=0, Suuu=0, Suvv=0, Svvv=0, Svuu=0;
+  for (let i = 0; i < x.length; i++) {
+    Suu += u[i]*u[i];
+    Suv += u[i]*v[i];
+    Svv += v[i]*v[i];
+    Suuu += u[i]*u[i]*u[i];
+    Suvv += u[i]*v[i]*v[i];
+    Svvv += v[i]*v[i]*v[i];
+    Svuu += v[i]*u[i]*u[i];
+  }
+
+  const A = [[Suu, Suv], [Suv, Svv]];
+  const B = [0.5*(Suuu + Suvv), 0.5*(Svvv + Svuu)];
+  const [uc, vc] = solve2x2(A, B);
+  const xc = xm + uc;
+  const yc = ym + vc;
+  const r = Math.sqrt(uc*uc + vc*vc + (Suu + Svv) / x.length);
+  return [xc, yc, r];
+}
+
+function fitEDCircle(x, y) {
+  const A11 = x.reduce((s,v)=>s+v*v,0);
+  const A12 = x.reduce((s,v,i)=>s+v*y[i],0);
+  const A13 = x.reduce((s,v)=>s+v,0);
+  const A22 = y.reduce((s,v)=>s+v*v,0);
+  const A23 = y.reduce((s,v)=>s+v,0);
+  const A33 = x.length;
+
+  const b1 = x.reduce((s,v,i)=>s - v*(x[i]*x[i] + y[i]*y[i]),0);
+  const b2 = y.reduce((s,v,i)=>s - v*(x[i]*x[i] + y[i]*y[i]),0);
+  const b3 = x.reduce((s,v,i)=>s - (x[i]*x[i] + y[i]*y[i]),0);
+
+  const sol = solve3x3(
+    [[A11,A12,A13],[A12,A22,A23],[A13,A23,A33]],
+    [b1,b2,b3]
+  );
+
+  const D = sol[0], E = sol[1], F = sol[2];
+  const xc = -D / 2;
+  const yc = -E / 2;
+  const rr = (D*D + E*E)/4 - F;
+  if (rr <= 0) throw new Error("Invalid radius");
+  return [xc, yc, Math.sqrt(rr)];
+}
+
+function fitGeometricLS(x, y, iterations=12) {
+  let [xc, yc, r] = fitTaubin(x, y);
+
+  for (let it = 0; it < iterations; it++) {
+    let J11=0, J12=0, J13=0, J22=0, J23=0, J33=x.length;
+    let B1=0, B2=0, B3=0;
+
+    for (let i = 0; i < x.length; i++) {
+      const dx = xc - x[i];
+      const dy = yc - y[i];
+      const di = Math.sqrt(dx*dx + dy*dy) + 1e-12;
+      const fi = di - r;
+
+      const j1 = dx / di;
+      const j2 = dy / di;
+      const j3 = -1;
+
+      J11 += j1*j1;
+      J12 += j1*j2;
+      J13 += j1*j3;
+      J22 += j2*j2;
+      J23 += j2*j3;
+      B1 += j1*fi;
+      B2 += j2*fi;
+      B3 += j3*fi;
+    }
+
+    const delta = solve3x3(
+      [[J11,J12,J13],[J12,J22,J23],[J13,J23,J33]],
+      [-B1,-B2,-B3]
+    );
+
+    xc += delta[0];
+    yc += delta[1];
+    r  += delta[2];
+
+    if (Math.abs(delta[0]) + Math.abs(delta[1]) + Math.abs(delta[2]) < 1e-6) break;
+  }
+
+  return [xc, yc, r];
+}
+
+function fitRANSAC(x, y, iterations=80, threshold=2.0) {
+  const n = x.length;
+  let bestCount = -1;
+  let best = null;
+
+  for (let it = 0; it < iterations; it++) {
+    const ids = new Set();
+    while (ids.size < 3) ids.add(Math.floor(Math.random() * n));
+    const id = [...ids];
+
+    try {
+      const [xc, yc, r] = circleFrom3Points(
+        x[id[0]], y[id[0]], x[id[1]], y[id[1]], x[id[2]], y[id[2]]
+      );
+      let count = 0;
+      for (let i = 0; i < n; i++) {
+        const d = Math.hypot(x[i]-xc, y[i]-yc);
+        if (Math.abs(d - r) < threshold) count++;
+      }
+      if (count > bestCount) {
+        bestCount = count;
+        best = [xc, yc, r];
+      }
+    } catch(e) {}
+  }
+
+  if (!best) return fitTaubin(x, y);
+  return best;
+}
+
+function fitIRLS(x, y, iterations=10) {
+  let weights = Array(x.length).fill(1);
+  let xc = mean(x), yc = mean(y), r = mean(computeRadiusFromCenter(x,y,xc,yc));
+
+  for (let it = 0; it < iterations; it++) {
+    let A11=0,A12=0,A13=0,A22=0,A23=0,A33=0;
+    let b1=0,b2=0,b3=0;
+
+    for (let i = 0; i < x.length; i++) {
+      const w = weights[i];
+      const xx = x[i], yy = y[i];
+      A11 += w * 4 * xx * xx;
+      A12 += w * 4 * xx * yy;
+      A13 += w * 2 * xx;
+      A22 += w * 4 * yy * yy;
+      A23 += w * 2 * yy;
+      A33 += w;
+      const bb = xx*xx + yy*yy;
+      b1 += w * 2 * xx * bb;
+      b2 += w * 2 * yy * bb;
+      b3 += w * bb;
+    }
+
+    const c = solve3x3(
+      [[A11,A12,A13],[A12,A22,A23],[A13,A23,A33]],
+      [b1,b2,b3]
+    );
+
+    xc = c[0];
+    yc = c[1];
+    const rr = c[2] + xc*xc + yc*yc;
+    if (rr <= 0) break;
+    r = Math.sqrt(rr);
+
+    const residuals = [];
+    for (let i = 0; i < x.length; i++) {
+      residuals.push(Math.abs(Math.hypot(x[i]-xc, y[i]-yc) - r));
+    }
+    const maxRes = Math.max(...residuals, 1e-6);
+    weights = residuals.map(v => 1 / Math.max(v, 1e-6) / (1 / maxRes));
+  }
+
+  return [xc, yc, r];
+}
+
+function plotRThetaArrays(x, y) {
+  const xc = mean(x), yc = mean(y);
+  const data = [];
+  for (let i = 0; i < x.length; i++) {
+    const th = Math.atan2(y[i] - yc, x[i] - xc);
+    const rr = Math.hypot(x[i] - xc, y[i] - yc);
+    data.push({th, rr});
+  }
+  data.sort((a,b) => a.th - b.th);
+  return {
+    theta: data.map(v => v.th),
+    r: data.map(v => v.rr)
+  };
 }
 
 function currentParams() {
@@ -863,78 +656,57 @@ function currentParams() {
   };
 }
 
+function setStatus(msg) {
+  document.getElementById('status_box').textContent = msg;
+}
+
+function updateSliderValues() {
+  document.getElementById('sigma_val').textContent = document.getElementById('sigma').value;
+  document.getElementById('n_points_val').textContent = document.getElementById('n_points').value;
+  document.getElementById('a_val').textContent = document.getElementById('a').value;
+  document.getElementById('b_val').textContent = document.getElementById('b').value;
+}
+
 function renderScatter(scatter) {
   const traces = [
     {
-      x: scatter.x_in,
-      y: scatter.y_in,
-      mode: 'markers',
-      type: 'scatter',
-      name: 'Inlier',
-      marker: { size: 5 }
+      x: scatter.x_in, y: scatter.y_in,
+      mode: 'markers', type: 'scatter', name: 'Inlier',
+      marker: { size: 4 }
     },
     {
-      x: scatter.x_out_cluster,
-      y: scatter.y_out_cluster,
-      mode: 'markers',
-      type: 'scatter',
-      name: 'Cluster Outlier',
+      x: scatter.x_out_cluster, y: scatter.y_out_cluster,
+      mode: 'markers', type: 'scatter', name: 'Cluster Outlier',
       marker: { size: 7, symbol: 'circle' }
     },
     {
-      x: scatter.x_out_near,
-      y: scatter.y_out_near,
-      mode: 'markers',
-      type: 'scatter',
-      name: 'Near-Ellipse Outlier',
+      x: scatter.x_out_near, y: scatter.y_out_near,
+      mode: 'markers', type: 'scatter', name: 'Near-Ellipse Outlier',
       marker: { size: 7, symbol: 'diamond' }
     },
     {
-      x: scatter.x_out_random,
-      y: scatter.y_out_random,
-      mode: 'markers',
-      type: 'scatter',
-      name: 'Random Outlier',
-      marker: { size: 7, symbol: 'x' }
-    },
-    {
-      x: scatter.x_filtered,
-      y: scatter.y_filtered,
-      mode: 'markers',
-      type: 'scatter',
-      name: 'Filtered',
+      x: scatter.x_filtered, y: scatter.y_filtered,
+      mode: 'markers', type: 'scatter', name: 'Filtered',
       marker: { size: 4, opacity: 0.65 }
     },
     {
-      x: scatter.x_circle_ref,
-      y: scatter.y_circle_ref,
-      mode: 'lines',
-      type: 'scatter',
-      name: 'Reference Circle',
+      x: scatter.x_circle_ref, y: scatter.y_circle_ref,
+      mode: 'lines', type: 'scatter', name: 'Reference Circle',
       line: { width: 2 }
     },
     {
-      x: scatter.x_circle_fit,
-      y: scatter.y_circle_fit,
-      mode: 'lines',
-      type: 'scatter',
-      name: 'Fitted Circle',
+      x: scatter.x_circle_fit, y: scatter.y_circle_fit,
+      mode: 'lines', type: 'scatter', name: 'Fitted Circle',
       line: { width: 3 }
     },
     {
-      x: scatter.x_true_center,
-      y: scatter.y_true_center,
-      mode: 'markers',
-      type: 'scatter',
-      name: 'True Center',
+      x: [scatter.x_true_center], y: [scatter.y_true_center],
+      mode: 'markers', type: 'scatter', name: 'True Center',
       marker: { size: 11, symbol: 'cross' }
     },
     {
-      x: scatter.x_est_center,
-      y: scatter.y_est_center,
-      mode: 'markers',
-      type: 'scatter',
-      name: 'Estimated Center',
+      x: [scatter.x_est_center], y: [scatter.y_est_center],
+      mode: 'markers', type: 'scatter', name: 'Estimated Center',
       marker: { size: 10, symbol: 'square' }
     }
   ];
@@ -944,7 +716,7 @@ function renderScatter(scatter) {
     xaxis: { title: 'x', scaleanchor: 'y' },
     yaxis: { title: 'y' },
     legend: { orientation: 'h' }
-  }, { responsive: true });
+  }, {responsive: true});
 }
 
 function renderRTheta(rtheta) {
@@ -955,7 +727,7 @@ function renderRTheta(rtheta) {
       mode: 'markers',
       type: 'scatter',
       name: 'Original',
-      marker: { size: 5 }
+      marker: { size: 4 }
     },
     {
       x: rtheta.theta_filtered,
@@ -963,7 +735,7 @@ function renderRTheta(rtheta) {
       mode: 'markers',
       type: 'scatter',
       name: 'Filtered',
-      marker: { size: 5 }
+      marker: { size: 4 }
     }
   ];
 
@@ -972,31 +744,28 @@ function renderRTheta(rtheta) {
     xaxis: { title: 'theta (radian)' },
     yaxis: { title: 'r' },
     legend: { orientation: 'h' }
-  }, { responsive: true });
+  }, {responsive: true});
 }
 
 function renderResultsBox(data) {
-  const c = data.counts;
-  const r = data.selected_result;
   document.getElementById('result_box').innerHTML = `
     <strong>Selected Combination</strong><br><br>
-    <strong>Outlier Removal:</strong> ${r.outlier_method}<br>
-    <strong>Fitting Method:</strong> ${r.fitting_method}<br><br>
+    <strong>Outlier Removal:</strong> ${data.selected_result.outlier_method}<br>
+    <strong>Fitting Method:</strong> ${data.selected_result.fitting_method}<br><br>
 
-    <strong>Inlier count:</strong> ${c.inlier}<br>
-    <strong>Cluster outliers:</strong> ${c.cluster_outlier}<br>
-    <strong>Near-ellipse outliers:</strong> ${c.near_outlier}<br>
-    <strong>Random outliers:</strong> ${c.random_outlier}<br>
-    <strong>Total points:</strong> ${c.total}<br>
-    <strong>Remaining after filtering:</strong> ${c.remaining}<br>
-    <strong>Removed:</strong> ${c.removed}<br><br>
+    <strong>Inlier count:</strong> ${data.counts.inlier}<br>
+    <strong>Cluster outliers:</strong> ${data.counts.cluster_outlier}<br>
+    <strong>Near-ellipse outliers:</strong> ${data.counts.near_outlier}<br>
+    <strong>Total points:</strong> ${data.counts.total}<br>
+    <strong>Remaining after filtering:</strong> ${data.counts.remaining}<br>
+    <strong>Removed:</strong> ${data.counts.removed}<br><br>
 
-    <strong>Estimated xc:</strong> ${r.x0.toFixed(4)}<br>
-    <strong>Estimated yc:</strong> ${r.y0.toFixed(4)}<br>
-    <strong>Estimated r:</strong> ${r.r.toFixed(4)}<br>
-    <strong>Reference r:</strong> ${r.r_ref.toFixed(4)}<br>
-    <strong>Center error:</strong> ${r.center_error.toFixed(4)}<br>
-    <strong>Radius error:</strong> ${r.radius_error.toFixed(4)}
+    <strong>Estimated xc:</strong> ${data.selected_result.x0.toFixed(4)}<br>
+    <strong>Estimated yc:</strong> ${data.selected_result.y0.toFixed(4)}<br>
+    <strong>Estimated r:</strong> ${data.selected_result.r.toFixed(4)}<br>
+    <strong>Reference r:</strong> ${data.selected_result.r_ref.toFixed(4)}<br>
+    <strong>Center error:</strong> ${data.selected_result.center_error.toFixed(4)}<br>
+    <strong>Radius error:</strong> ${data.selected_result.radius_error.toFixed(4)}
   `;
 }
 
@@ -1020,21 +789,150 @@ function renderTable(rows) {
   });
 }
 
-async function runDemo() {
+function runExperiment(params) {
+  const xc = 500;
+  const yc = 500;
+  const a = params.a;
+  const b = params.b;
+  const n_points = params.n_points;
+  const sigma = params.sigma;
+
+  const cluster_outliers = Math.floor(n_points * 0.02);
+  const near_ellipse_outliers = Math.floor(n_points * 0.02);
+  const random_outliers = 0;
+  const random_seed = 42;
+
+  const data = generateSyntheticEllipse({
+    xc, yc, a, b, n_points, sigma,
+    cluster_outliers, near_ellipse_outliers, random_outliers, random_seed
+  });
+
+  const outlierMethods = {
+    "None": removeOutliersNone,
+    "Proposed Local Z-Score": removeOutliersLocalZScoreProposed,
+    "Z-Score": removeOutliersZScore,
+    "MAD": removeOutliersMAD,
+    "Percentile": removeOutliersPercentile
+  };
+
+  const fittingMethods = {
+    "Geometric LS": fitGeometricLS,
+    "Pratt": fitPrattLike,
+    "Taubin": fitTaubin,
+    "RANSAC": fitRANSAC,
+    "IRLS": fitIRLS,
+    "EDCircle": fitEDCircle
+  };
+
+  const r_ref = (a + b) / 2.0;
+  const allResults = [];
+
+  Object.entries(outlierMethods).forEach(([outName, outFunc]) => {
+    const cleaned = outFunc(data.X, data.Y);
+    const x_clean = cleaned.x;
+    const y_clean = cleaned.y;
+    const removedCount = data.X.length - x_clean.length;
+
+    if (x_clean.length < 3) return;
+
+    Object.entries(fittingMethods).forEach(([fitName, fitFunc]) => {
+      try {
+        const [x0, y0, r] = fitFunc(x_clean, y_clean);
+        if (!isFinite(x0) || !isFinite(y0) || !isFinite(r)) return;
+        const center_error = Math.hypot(x0 - xc, y0 - yc);
+        const radius_error = Math.abs(r - r_ref);
+        allResults.push({
+          outlier_method: outName,
+          fitting_method: fitName,
+          n_remaining: x_clean.length,
+          n_removed: removedCount,
+          x0, y0, r, center_error, radius_error
+        });
+      } catch (e) {}
+    });
+  });
+
+  allResults.sort((a,b) =>
+    (a.radius_error - b.radius_error) || (a.center_error - b.center_error)
+  );
+
+  const cleanedSelected = outlierMethods[params.selected_outlier](data.X, data.Y);
+  const [x0_sel, y0_sel, r_sel] =
+    fittingMethods[params.selected_fitting](cleanedSelected.x, cleanedSelected.y);
+
+  const center_error_sel = Math.hypot(x0_sel - xc, y0_sel - yc);
+  const radius_error_sel = Math.abs(r_sel - r_ref);
+
+  const rtOrig = plotRThetaArrays(data.X, data.Y);
+  const rtFilt = plotRThetaArrays(cleanedSelected.x, cleanedSelected.y);
+
+  const th = linspace(0, 2*Math.PI, 400, true);
+  const x_circle_ref = th.map(t => xc + r_ref * Math.cos(t));
+  const y_circle_ref = th.map(t => yc + r_ref * Math.sin(t));
+  const x_circle_fit = th.map(t => x0_sel + r_sel * Math.cos(t));
+  const y_circle_fit = th.map(t => y0_sel + r_sel * Math.sin(t));
+
+  return {
+    counts: {
+      inlier: data.x_in.length,
+      cluster_outlier: data.x_out_cluster.length,
+      near_outlier: data.x_out_near.length,
+      total: data.X.length,
+      remaining: cleanedSelected.x.length,
+      removed: data.X.length - cleanedSelected.x.length
+    },
+    scatter: {
+      x_in: data.x_in,
+      y_in: data.y_in,
+      x_out_cluster: data.x_out_cluster,
+      y_out_cluster: data.y_out_cluster,
+      x_out_near: data.x_out_near,
+      y_out_near: data.y_out_near,
+      x_filtered: cleanedSelected.x,
+      y_filtered: cleanedSelected.y,
+      x_circle_ref,
+      y_circle_ref,
+      x_circle_fit,
+      y_circle_fit,
+      x_true_center: xc,
+      y_true_center: yc,
+      x_est_center: x0_sel,
+      y_est_center: y0_sel
+    },
+    rtheta: {
+      theta_original: rtOrig.theta,
+      r_original: rtOrig.r,
+      theta_filtered: rtFilt.theta,
+      r_filtered: rtFilt.r
+    },
+    selected_result: {
+      outlier_method: params.selected_outlier,
+      fitting_method: params.selected_fitting,
+      x0: x0_sel,
+      y0: y0_sel,
+      r: r_sel,
+      r_ref: r_ref,
+      center_error: center_error_sel,
+      radius_error: radius_error_sel
+    },
+    top10: allResults.slice(0, 10)
+  };
+}
+
+function runDemo() {
   updateSliderValues();
-  if (!pyReady) return;
+  setStatus('Running...');
+  const t0 = performance.now();
 
   try {
-    setStatus('Running analysis...');
     const params = currentParams();
-    pyodide.globals.set('js_params', JSON.stringify(params));
-    const resultJson = await pyodide.runPythonAsync('run_experiment(js_params)');
-    const data = JSON.parse(resultJson);
+    const data = runExperiment(params);
     renderScatter(data.scatter);
     renderRTheta(data.rtheta);
     renderResultsBox(data);
     renderTable(data.top10);
-    setStatus('Completed.');
+    const t1 = performance.now();
+    setStatus(`Completed in ${(t1 - t0).toFixed(0)} ms`);
   } catch (err) {
     console.error(err);
     setStatus('Error: ' + err.message);
@@ -1047,5 +945,5 @@ document.querySelectorAll('input, select').forEach(el => {
 });
 
 updateSliderValues();
-initPy();
+runDemo();
 </script>
