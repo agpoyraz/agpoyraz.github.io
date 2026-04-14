@@ -4,8 +4,8 @@ collection: publications
 category: manuscripts
 permalink: /publication/diameter-enhancement
 date: 2025-01-01
-slidesurl: 'https://academicpages.github.io/files/slides3.pdf'
-paperurl: 'https://academicpages.github.io/files/paper3.pdf'
+slidesurl: ''
+paperurl: 'https://arxiv.org/abs/2508.03721'
 citation: 'Poyraz, Ahmet Gokhan, et al. "Enhancing Diameter Measurement Accuracy in Machine Vision Applications." arXiv preprint arXiv:2508.03721 (2025).'
 ---
 
