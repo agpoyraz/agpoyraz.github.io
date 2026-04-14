@@ -728,14 +728,12 @@ function fitIRLS(x, y, iterations = 10) {
   return [xc, yc, r];
 }
 
-function plotRThetaArrays(x, y) {
-  const xc = mean(x);
-  const yc = mean(y);
+function plotRThetaArrays(x, y, xc_ref, yc_ref) {
   const data = [];
 
   for (let i = 0; i < x.length; i++) {
-    const th = Math.atan2(y[i] - yc, x[i] - xc);
-    const rr = Math.hypot(x[i] - xc, y[i] - yc);
+    const th = Math.atan2(y[i] - yc_ref, x[i] - xc_ref);
+    const rr = Math.hypot(x[i] - xc_ref, y[i] - yc_ref);
     data.push({ th, rr });
   }
 
@@ -748,20 +746,31 @@ function plotRThetaArrays(x, y) {
 }
 
 function splitDetectedOutliers(allX, allY, filtX, filtY) {
-  const filtSet = new Set(
-    filtX.map((v, i) => `${v.toFixed(6)}_${filtY[i].toFixed(6)}`)
-  );
-
   const removedX = [];
   const removedY = [];
   const keptX = [];
   const keptY = [];
+  const used = new Array(filtX.length).fill(false);
 
   for (let i = 0; i < allX.length; i++) {
-    const key = `${allX[i].toFixed(6)}_${allY[i].toFixed(6)}`;
-    if (filtSet.has(key)) {
+    let foundIndex = -1;
+
+    for (let j = 0; j < filtX.length; j++) {
+      if (used[j]) continue;
+
+      if (
+        Math.abs(allX[i] - filtX[j]) < 1e-9 &&
+        Math.abs(allY[i] - filtY[j]) < 1e-9
+      ) {
+        foundIndex = j;
+        break;
+      }
+    }
+
+    if (foundIndex >= 0) {
       keptX.push(allX[i]);
       keptY.push(allY[i]);
+      used[foundIndex] = true;
     } else {
       removedX.push(allX[i]);
       removedY.push(allY[i]);
@@ -991,9 +1000,9 @@ function runExperiment(params) {
     cleanedSelected.y
   );
 
-  const rtOrig = plotRThetaArrays(data.X, data.Y);
+  const rtOrig = plotRThetaArrays(data.X, data.Y, xc, yc);
   const rtRemoved = splitDetected.removedX.length > 0
-    ? plotRThetaArrays(splitDetected.removedX, splitDetected.removedY)
+    ? plotRThetaArrays(splitDetected.removedX, splitDetected.removedY, xc, yc)
     : { theta: [], r: [] };
 
   const th = linspace(0, 2 * Math.PI, 400, true);
