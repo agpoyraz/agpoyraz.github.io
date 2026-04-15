@@ -146,12 +146,6 @@ classes: wide
 </style>
 
 <div class="cf-container">
-  <div class="cf-note">
-    This page runs directly in JavaScript for speed.
-    Adjustable variables are <code>sigma</code>, <code>n_points</code>, <code>a</code>, <code>b</code>,
-    <code>cluster_ratio</code>, and <code>near_ratio</code>.
-    Only the <code>Proposed Local Z-Score</code> method is used.
-  </div>
 
   <div class="cf-grid">
     <div class="cf-panel">
