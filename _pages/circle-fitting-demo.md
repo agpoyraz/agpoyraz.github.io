@@ -3,6 +3,7 @@ layout: single
 title: "Interactive Circle Fitting Demo"
 permalink: /circle-fitting-demo/
 author_profile: false
+classes: wide
 ---
 
 <div style="width:100%; margin:0; padding:0;">
