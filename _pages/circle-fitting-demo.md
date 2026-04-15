@@ -9,7 +9,7 @@ author_profile: false
 
   <video autoplay muted loop playsinline 
          style="width:100%; max-width:1400px; border-radius:12px;">
-    <source src="/assets/video/demo.mp4" type="video/mp4">
+    <source src="/assets/videos/demo.mp4" type="video/mp4">
   </video>
 
 </div>
