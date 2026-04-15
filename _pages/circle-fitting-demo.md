@@ -175,7 +175,7 @@ classes: wide
 
       <div class="cf-group">
         <label for="cluster_ratio">Cluster Outlier Ratio</label>
-        <input type="range" id="cluster_ratio" min="0" max="0.20" step="0.005" value="0.01">
+        <input type="range" id="cluster_ratio" min="0" max="0.01" step="0.001" value="0.01">
         <div class="cf-value"><span id="cluster_ratio_val">0.01</span></div>
       </div>
 
