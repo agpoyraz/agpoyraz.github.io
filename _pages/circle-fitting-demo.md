@@ -6,10 +6,10 @@ author_profile: false
 classes: wide
 ---
 
-<div style="width:100%; margin:0; padding:0;">
+<div style="width:100vw; position:relative; left:50%; margin-left:-50vw;">
 
   <video autoplay muted loop playsinline 
-         style="width:100%; max-width:1400px; border-radius:12px;">
+         style="width:100%; display:block;">
     <source src="/assets/videos/demo.mp4" type="video/mp4">
   </video>
 
@@ -17,13 +17,11 @@ classes: wide
 
 <style>
   .page {
-    max-width: 100% !important;
+    max-width: 1400px !important;
   }
 
   .page__content {
-    max-width: 100% !important;
-    padding-left: 0 !important;
-    padding-right: 0 !important;
+    max-width: 1400px !important;
   }
 
   .cf-container {
