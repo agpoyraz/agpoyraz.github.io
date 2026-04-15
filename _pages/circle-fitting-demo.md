@@ -411,6 +411,8 @@ function removeOutliersLocalZScoreProposed(x, y, threshold = 3, window_size = 60
   }
 
   const idx = Array.from(theta.keys()).sort((a, b) => theta[a] - theta[b]);
+
+  const theta_sorted = idx.map(i => theta[i]);
   const r_sorted = idx.map(i => r[i]);
   const x_sorted = idx.map(i => x[i]);
   const y_sorted = idx.map(i => y[i]);
@@ -444,14 +446,21 @@ function removeOutliersLocalZScoreProposed(x, y, threshold = 3, window_size = 60
     }
   }
 
+  const theta_clean = [];
+  const r_clean = [];
   const x_filt = [];
   const y_filt = [];
 
   for (let i = 0; i < n; i++) {
     if (mask[i]) {
-      x_filt.push(x_sorted[i]);
-      y_filt.push(y_sorted[i]);
+      theta_clean.push(theta_sorted[i]);
+      r_clean.push(r_sorted[i]);
     }
+  }
+
+  for (let i = 0; i < theta_clean.length; i++) {
+    x_filt.push(r_clean[i] * Math.cos(theta_clean[i]) + xc);
+    y_filt.push(r_clean[i] * Math.sin(theta_clean[i]) + yc);
   }
 
   return { x: x_filt, y: y_filt };
@@ -527,12 +536,15 @@ function fitGeometricLS(x, y, iterations = 12) {
   return [xc, yc, r];
 }
 
-function plotRThetaArrays(x, y, xc_ref, yc_ref) {
+function plotRThetaArrays(x, y) {
+  const xc = mean(x);
+  const yc = mean(y);
+
   const data = [];
 
   for (let i = 0; i < x.length; i++) {
-    const th = Math.atan2(y[i] - yc_ref, x[i] - xc_ref);
-    const rr = Math.hypot(x[i] - xc_ref, y[i] - yc_ref);
+    const th = Math.atan2(y[i] - yc, x[i] - xc);
+    const rr = Math.hypot(x[i] - xc, y[i] - yc);
     data.push({ th, rr });
   }
 
@@ -650,25 +662,25 @@ function renderScatter(scatter) {
 function renderRTheta(rtheta) {
   const traces = [
     {
-      x: rtheta.theta_original,
-      y: rtheta.r_original,
+      x: rtheta.theta_all,
+      y: rtheta.r_all,
+      mode: 'markers',
+      type: 'scatter',
+      name: 'Outlier',
+      marker: { size: 4, color: '#d62728' }
+    },
+    {
+      x: rtheta.theta_kept,
+      y: rtheta.r_kept,
       mode: 'markers',
       type: 'scatter',
       name: 'Original',
       marker: { size: 4, color: '#1f77b4' }
-    },
-    {
-      x: rtheta.theta_removed,
-      y: rtheta.r_removed,
-      mode: 'markers',
-      type: 'scatter',
-      name: 'Detected Outliers',
-      marker: { size: 6, color: '#d62728' }
     }
   ];
 
   Plotly.newPlot('plot_rtheta', traces, {
-    title: 'r-theta Plot',
+    title: 'Outlier Removal in Polar Coordinates',
     xaxis: { title: 'theta (radian)' },
     yaxis: { title: 'r' },
     legend: { orientation: 'h' }
@@ -740,9 +752,9 @@ function runExperiment(params) {
     cleanedSelected.y
   );
 
-  const rtOrig = plotRThetaArrays(data.X, data.Y, xc, yc);
-  const rtRemoved = splitDetected.removedX.length > 0
-    ? plotRThetaArrays(splitDetected.removedX, splitDetected.removedY, xc, yc)
+  const rtOrig = plotRThetaArrays(data.X, data.Y);
+  const rtKept = cleanedSelected.x.length > 0
+    ? plotRThetaArrays(cleanedSelected.x, cleanedSelected.y)
     : { theta: [], r: [] };
 
   const th = linspace(0, 2 * Math.PI, 400, true);
@@ -767,10 +779,10 @@ function runExperiment(params) {
       y_est_center: y0_sel
     },
     rtheta: {
-      theta_original: rtOrig.theta,
-      r_original: rtOrig.r,
-      theta_removed: rtRemoved.theta,
-      r_removed: rtRemoved.r
+      theta_all: rtOrig.theta,
+      r_all: rtOrig.r,
+      theta_kept: rtKept.theta,
+      r_kept: rtKept.r
     },
     selected_result: {
       x0: x0_sel,
