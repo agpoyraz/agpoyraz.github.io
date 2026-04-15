@@ -5,29 +5,24 @@ permalink: /circle-fitting-demo/
 author_profile: false
 ---
 
-<div style="position:relative; text-align:center; margin-bottom:40px;">
+<div style="width:100%; margin:0; padding:0;">
 
-  <video autoplay muted loop playsinline style="width:90%; border-radius:12px;">
-    <source src="/assets/videos/demo.mp4" type="video/mp4">
+  <video autoplay muted loop playsinline 
+         style="width:100%; max-width:1400px; border-radius:12px;">
+    <source src="/assets/video/demo.mp4" type="video/mp4">
   </video>
-
-  <h2 style="
-    position:absolute;
-    bottom:10%;
-    left:50%;
-    transform:translateX(-50%);
-    color:white;
-    background:rgba(0,0,0,0.5);
-    padding:10px 20px;
-    border-radius:10px;">
-    Circle Fitting Demo
-  </h2>
 
 </div>
 
 <style>
   .page {
     max-width: 100% !important;
+  }
+
+  .page__content {
+    max-width: 100% !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
   }
 
   .cf-container {
