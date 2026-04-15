@@ -448,8 +448,6 @@ function removeOutliersLocalZScoreProposed(x, y, threshold = 3, window_size = 60
 
   const theta_clean = [];
   const r_clean = [];
-  const x_filt = [];
-  const y_filt = [];
 
   for (let i = 0; i < n; i++) {
     if (mask[i]) {
@@ -458,12 +456,24 @@ function removeOutliersLocalZScoreProposed(x, y, threshold = 3, window_size = 60
     }
   }
 
+  const x_filt = [];
+  const y_filt = [];
+
   for (let i = 0; i < theta_clean.length; i++) {
     x_filt.push(r_clean[i] * Math.cos(theta_clean[i]) + xc);
     y_filt.push(r_clean[i] * Math.sin(theta_clean[i]) + yc);
   }
 
-  return { x: x_filt, y: y_filt };
+  return {
+    x: x_filt,
+    y: y_filt,
+    theta_sorted: theta_sorted,
+    r_sorted: r_sorted,
+    theta_clean: theta_clean,
+    r_clean: r_clean,
+    xc: xc,
+    yc: yc
+  };
 }
 
 function fitTaubin(x, y) {
@@ -662,16 +672,16 @@ function renderScatter(scatter) {
 function renderRTheta(rtheta) {
   const traces = [
     {
-      x: rtheta.theta_all,
-      y: rtheta.r_all,
+      x: rtheta.theta_sorted,
+      y: rtheta.r_sorted,
       mode: 'markers',
       type: 'scatter',
       name: 'Outlier',
       marker: { size: 4, color: '#d62728' }
     },
     {
-      x: rtheta.theta_kept,
-      y: rtheta.r_kept,
+      x: rtheta.theta_clean,
+      y: rtheta.r_clean,
       mode: 'markers',
       type: 'scatter',
       name: 'Original',
@@ -752,10 +762,12 @@ function runExperiment(params) {
     cleanedSelected.y
   );
 
-  const rtOrig = plotRThetaArrays(data.X, data.Y);
-  const rtKept = cleanedSelected.x.length > 0
-    ? plotRThetaArrays(cleanedSelected.x, cleanedSelected.y)
-    : { theta: [], r: [] };
+  const rtData = {
+    theta_sorted: cleanedSelected.theta_sorted,
+    r_sorted: cleanedSelected.r_sorted,
+    theta_clean: cleanedSelected.theta_clean,
+    r_clean: cleanedSelected.r_clean
+  };
 
   const th = linspace(0, 2 * Math.PI, 400, true);
   const x_circle_fit = th.map(t => x0_sel + r_sel * Math.cos(t));
@@ -779,10 +791,10 @@ function runExperiment(params) {
       y_est_center: y0_sel
     },
     rtheta: {
-      theta_all: rtOrig.theta,
-      r_all: rtOrig.r,
-      theta_kept: rtKept.theta,
-      r_kept: rtKept.r
+      theta_sorted: rtData.theta_sorted,
+      r_sorted: rtData.r_sorted,
+      theta_clean: rtData.theta_clean,
+      r_clean: rtData.r_clean
     },
     selected_result: {
       x0: x0_sel,
