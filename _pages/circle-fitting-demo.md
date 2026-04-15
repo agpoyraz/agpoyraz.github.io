@@ -8,7 +8,7 @@ author_profile: false
 <div style="position:relative; text-align:center; margin-bottom:40px;">
 
   <video autoplay muted loop playsinline style="width:90%; border-radius:12px;">
-    <source src="/assets/video/demo.mp4" type="video/mp4">
+    <source src="/assets/videos/demo.mp4" type="video/mp4">
   </video>
 
   <h2 style="
