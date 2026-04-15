@@ -198,9 +198,6 @@ classes: wide
 
       <div class="cf-status" id="status_box">Ready.</div>
 
-      <div class="cf-box" id="result_box">
-        Results will appear here.
-      </div>
     </div>
 
     <div>
@@ -678,21 +675,6 @@ function renderRTheta(rtheta) {
   }, { responsive: true });
 }
 
-function renderResultsBox(data) {
-  document.getElementById('result_box').innerHTML = `
-    <strong>Total points:</strong> ${data.counts.total}<br>
-    <strong>True outliers:</strong> ${data.counts.true_outlier_total}<br>
-    <strong>Remaining after filtering:</strong> ${data.counts.remaining}<br>
-    <strong>Removed:</strong> ${data.counts.removed}<br><br>
-
-    <strong>Estimated xc:</strong> ${data.selected_result.x0.toFixed(4)}<br>
-    <strong>Estimated yc:</strong> ${data.selected_result.y0.toFixed(4)}<br>
-    <strong>Estimated r:</strong> ${data.selected_result.r.toFixed(4)}<br>
-    <strong>Reference r:</strong> ${data.selected_result.r_ref.toFixed(4)}<br>
-    <strong>Center error:</strong> ${data.selected_result.center_error.toFixed(4)}<br>
-    <strong>Radius error:</strong> ${data.selected_result.radius_error.toFixed(4)}
-  `;
-}
 
 function appendResultRow(data, params) {
   runCounter += 1;
@@ -808,7 +790,6 @@ function runDemo() {
     const result = runExperiment(params);
     renderScatter(result.scatter);
     renderRTheta(result.rtheta);
-    renderResultsBox(result);
     appendResultRow(result, params);
     setStatus("Completed.");
   } catch (err) {
