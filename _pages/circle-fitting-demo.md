@@ -157,38 +157,38 @@ classes: wide
     <div class="cf-panel">
       <div class="cf-group">
         <label for="sigma">Sigma</label>
-        <input type="range" id="sigma" min="0" max="5" step="0.1" value="0.8">
+        <input type="range" id="sigma" min="0" max="1" step="0.1" value="0.8">
         <div class="cf-value"><span id="sigma_val">0.8</span></div>
       </div>
 
       <div class="cf-group">
         <label for="n_points">n_points</label>
-        <input type="range" id="n_points" min="100" max="3000" step="50" value="1000">
+        <input type="range" id="n_points" min="200" max="3000" step="50" value="1000">
         <div class="cf-value"><span id="n_points_val">1000</span></div>
       </div>
 
       <div class="cf-group">
         <label for="a">a</label>
-        <input type="range" id="a" min="100" max="1000" step="5" value="675">
-        <div class="cf-value"><span id="a_val">675</span></div>
+        <input type="range" id="a" min="670" max="690" step="1" value="682">
+        <div class="cf-value"><span id="a_val">682</span></div>
       </div>
 
       <div class="cf-group">
         <label for="b">b</label>
-        <input type="range" id="b" min="100" max="1000" step="5" value="685">
-        <div class="cf-value"><span id="b_val">685</span></div>
+        <input type="range" id="b" min="670" max="690" step="1" value="678">
+        <div class="cf-value"><span id="b_val">678</span></div>
       </div>
 
       <div class="cf-group">
         <label for="cluster_ratio">Cluster Outlier Ratio</label>
-        <input type="range" id="cluster_ratio" min="0" max="0.20" step="0.005" value="0.02">
-        <div class="cf-value"><span id="cluster_ratio_val">0.02</span></div>
+        <input type="range" id="cluster_ratio" min="0" max="0.20" step="0.005" value="0.01">
+        <div class="cf-value"><span id="cluster_ratio_val">0.01</span></div>
       </div>
 
       <div class="cf-group">
         <label for="near_ratio">Near-Ellipse Outlier Ratio</label>
-        <input type="range" id="near_ratio" min="0" max="0.20" step="0.005" value="0.02">
-        <div class="cf-value"><span id="near_ratio_val">0.02</span></div>
+        <input type="range" id="near_ratio" min="0" max="0.20" step="0.005" value="0.01">
+        <div class="cf-value"><span id="near_ratio_val">0.01</span></div>
       </div>
 
       <div class="cf-group cf-row-btns">
