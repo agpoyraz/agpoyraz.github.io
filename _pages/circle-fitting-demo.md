@@ -6,31 +6,40 @@ author_profile: false
 classes: wide
 ---
 
-<div style="width:100vw; position:relative; left:50%; margin-left:-50vw;">
-
-  <video autoplay muted loop playsinline 
-         style="width:100%; display:block;">
+<div style="width:100vw; position:relative; left:50%; margin-left:-50vw; margin-bottom:32px;">
+  <video autoplay muted loop playsinline style="width:100%; display:block;">
     <source src="/assets/videos/demo.mp4" type="video/mp4">
   </video>
-
 </div>
 
 <style>
+  .wrapper {
+    max-width: 100% !important;
+  }
+
   .page {
-    max-width: 1000px !important;
+    max-width: 100% !important;
+    padding-left: 32px !important;
+    padding-right: 32px !important;
   }
 
   .page__content {
-    max-width: 1000px !important;
+    max-width: 100% !important;
+  }
+
+  #main {
+    max-width: 100% !important;
   }
 
   .cf-container {
     width: 100%;
+    max-width: 1600px;
+    margin: 0 auto;
   }
 
   .cf-grid {
     display: grid;
-    grid-template-columns: 320px 1fr;
+    grid-template-columns: 320px minmax(0, 1fr);
     gap: 24px;
     align-items: start;
   }
@@ -124,9 +133,15 @@ classes: wide
   }
 
   @media (max-width: 980px) {
+    .page {
+      padding-left: 16px !important;
+      padding-right: 16px !important;
+    }
+
     .cf-grid {
       grid-template-columns: 1fr;
     }
+
     .cf-panel {
       position: static;
     }
