@@ -4,6 +4,13 @@ title: "Interactive Circle Fitting Demo"
 permalink: /circle-fitting-demo/
 author_profile: false
 ---
+<div style="width:100%; text-align:center; margin-bottom:30px;">
+
+  <video autoplay muted loop playsinline style="width:90%; max-width:900px; border-radius:12px;">
+    <source src="/assets/video/demo.mp4" type="video/mp4">
+  </video>
+
+</div>
 
 <style>
   .page {
