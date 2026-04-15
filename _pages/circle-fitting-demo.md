@@ -124,11 +124,6 @@ classes: wide
     background: #f2f2f2;
   }
 
-  .cf-small {
-    font-size: 0.9rem;
-    color: #666;
-  }
-
   .cf-row-btns {
     display: flex;
     gap: 8px;
@@ -199,15 +194,6 @@ classes: wide
       <div class="cf-group cf-row-btns">
         <button id="run_btn">Run Demo</button>
         <button id="clear_table_btn" type="button">Clear Table</button>
-      </div>
-
-      <div class="cf-small">
-        Current settings:<br>
-        cluster_outliers = int(n_points × cluster_ratio)<br>
-        near_ellipse_outliers = int(n_points × near_ratio)<br>
-        random_outliers = 0<br>
-        random_seed = 42<br>
-        outlier_method = Proposed Local Z-Score
       </div>
 
       <div class="cf-status" id="status_box">Ready.</div>
@@ -694,10 +680,6 @@ function renderRTheta(rtheta) {
 
 function renderResultsBox(data) {
   document.getElementById('result_box').innerHTML = `
-    <strong>Method</strong><br><br>
-    <strong>Outlier Removal:</strong> Proposed Local Z-Score<br>
-    <strong>Fitting Method:</strong> Geometric LS<br><br>
-
     <strong>Total points:</strong> ${data.counts.total}<br>
     <strong>True outliers:</strong> ${data.counts.true_outlier_total}<br>
     <strong>Remaining after filtering:</strong> ${data.counts.remaining}<br>
