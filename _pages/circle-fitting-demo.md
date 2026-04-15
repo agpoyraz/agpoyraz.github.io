@@ -17,11 +17,11 @@ classes: wide
 
 <style>
   .page {
-    max-width: 1400px !important;
+    max-width: 1000px !important;
   }
 
   .page__content {
-    max-width: 1400px !important;
+    max-width: 1000px !important;
   }
 
   .cf-container {
