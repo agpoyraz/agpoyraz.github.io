@@ -6,15 +6,6 @@ author_profile: false
 classes: wide
 ---
 
-<div style="width:100%; margin-bottom:32px;">
-
-  <video autoplay muted loop playsinline 
-         style="width:100%; max-width:1200px; display:block; margin:auto; border-radius:12px;">
-    <source src="/assets/videos/demo.mp4" type="video/mp4">
-  </video>
-
-</div>
-
 <style>
   .wrapper {
     max-width: 100% !important;
@@ -249,6 +240,15 @@ classes: wide
       </div>
     </div>
   </div>
+</div>
+
+<div style="width:100%; margin-bottom:32px;">
+
+  <video autoplay muted loop playsinline 
+         style="width:100%; max-width:1200px; display:block; margin:auto; border-radius:12px;">
+    <source src="/assets/videos/demo.mp4" type="video/mp4">
+  </video>
+
 </div>
 
 <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
