@@ -50,29 +50,39 @@ classes: wide
   .cf-panel {
     border: 1px solid #ddd;
     border-radius: 12px;
-    padding: 16px;
     position: sticky;
     top: 20px;
     background: #fff;
+    padding: 12px;
+    font-size: 0.85rem;
   }
 
   .cf-group {
-    margin-bottom: 16px;
+    margin-bottom: 10px;
   }
 
   .cf-group label {
     display: block;
     font-weight: 600;
-    margin-bottom: 6px;
+    font-size: 0.8rem;
+    margin-bottom: 4px;
   }
 
   .cf-group input[type="range"],
   .cf-group button {
     width: 100%;
+    height: 4px;
+    font-size: 0.8rem;
+    padding: 6px;
+  }
+  
+  .cf-group input[type="range"]::-webkit-slider-thumb {
+    width: 12px;
+    height: 12px;
   }
 
   .cf-value {
-    font-size: 0.95rem;
+    font-size: 0.75rem;
     color: #555;
   }
 
