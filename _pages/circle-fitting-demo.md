@@ -197,12 +197,6 @@ classes: wide
         <button id="clear_table_btn" type="button">Clear Table</button>
       </div>
 
-      <div class="cf-group">
-        <label for="num_iterations">Iteration Count</label>
-        <input type="range" id="num_iterations" min="1" max="10" step="1" value="1">
-        <div class="cf-value"><span id="num_iterations_val">1</span></div>
-      </div>
-
       <div class="cf-status" id="status_box">Ready.</div>
 
     </div>
@@ -683,7 +677,6 @@ function currentParams() {
     b: parseFloat(document.getElementById('b').value),
     cluster_ratio: parseFloat(document.getElementById('cluster_ratio').value),
     cluster_removal_mode: parseInt(document.getElementById('cluster_removal_mode').value, 10),
-    num_iterations: parseInt(document.getElementById('num_iterations').value, 10),
     near_ratio: parseFloat(document.getElementById('near_ratio').value)
   };
 }
@@ -701,8 +694,6 @@ function updateSliderValues() {
   document.getElementById('near_ratio_val').textContent = document.getElementById('near_ratio').value;
   document.getElementById('cluster_removal_mode_val').textContent =
   document.getElementById('cluster_removal_mode').value === "1" ? "on" : "off";
-  document.getElementById('num_iterations_val').textContent =
-    document.getElementById('num_iterations').value;
 }
 
 function renderScatter(scatter) {
@@ -770,7 +761,7 @@ function renderRTheta(rtheta) {
   ];
 
   Plotly.newPlot('plot_rtheta', traces, {
-    title: `Outlier Removal in Polar Coordinates - Iteration ${rtheta.iteration}`,
+    title: 'Outlier Removal in Polar Coordinates',
     xaxis: { title: 'theta (radian)' },
     yaxis: { title: 'r' },
     legend: { orientation: 'h' }
@@ -791,7 +782,6 @@ function appendResultRow(data, params) {
     <td>${params.b.toFixed(0)}</td>
     <td>${params.cluster_ratio.toFixed(3)}</td>
     <td>${params.near_ratio.toFixed(3)}</td>
-    <td>${params.num_iterations}</td>
     <td>${data.counts.total}</td>
     <td>${data.counts.removed}</td>
     <td>${data.counts.remaining}</td>
@@ -849,17 +839,7 @@ function runExperiment(params) {
     }
   }
   
-  let cleanedSelected = null;
-  let x_iter = x_for_cleaning;
-  let y_iter = y_for_cleaning;
-  
-  for (let iter = 1; iter <= params.num_iterations; iter++) {
-    cleanedSelected = removeOutliersLocalZScoreProposed(x_iter, y_iter);
-    x_iter = cleanedSelected.x;
-    y_iter = cleanedSelected.y;
-  }
-  
-  cleanedSelected.iteration = params.num_iterations;
+  const cleanedSelected = removeOutliersLocalZScoreProposed(x_for_cleaning, y_for_cleaning);
   const [x0_sel, y0_sel, r_sel] = fitGeometricLS(cleanedSelected.x, cleanedSelected.y);
 
   const r_ref = (a + b) / 2.0;
@@ -916,8 +896,7 @@ function runExperiment(params) {
       theta_sorted: rtData.theta_sorted,
       r_sorted: rtData.r_sorted,
       theta_clean: rtData.theta_clean,
-      r_clean: rtData.r_clean,
-      iteration: cleanedSelected.iteration
+      r_clean: rtData.r_clean
     },
     selected_result: {
       x0: x0_sel,
