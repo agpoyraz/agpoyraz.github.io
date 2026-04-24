@@ -176,7 +176,7 @@ classes: wide
 
       <div class="cf-group">
         <label for="cluster_ratio">Cluster Outlier Ratio</label>
-        <input type="range" id="cluster_ratio" min="0" max="0.03" step="0.001" value="0.01">
+        <input type="range" id="cluster_ratio" min="0" max="0.1" step="0.001" value="0.01">
         <div class="cf-value"><span id="cluster_ratio_val">0.01</span></div>
       </div>
 
@@ -188,7 +188,7 @@ classes: wide
 
       <div class="cf-group">
         <label for="near_ratio">Near-Ellipse Outlier Ratio</label>
-        <input type="range" id="near_ratio" min="0" max="0.01" step="0.001" value="0.01">
+        <input type="range" id="near_ratio" min="0" max="0.1" step="0.001" value="0.01">
         <div class="cf-value"><span id="near_ratio_val">0.01</span></div>
       </div>
 
