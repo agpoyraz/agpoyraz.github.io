@@ -175,8 +175,14 @@ classes: wide
 
       <div class="cf-group">
         <label for="cluster_ratio">Cluster Outlier Ratio</label>
-        <input type="range" id="cluster_ratio" min="0" max="0.01" step="0.001" value="0.01">
+        <input type="range" id="cluster_ratio" min="0" max="0.03" step="0.001" value="0.01">
         <div class="cf-value"><span id="cluster_ratio_val">0.01</span></div>
+      </div>
+
+      <div class="cf-group">
+        <label for="cluster_removal_mode">Cluster Outlier Removal</label>
+        <input type="range" id="cluster_removal_mode" min="0" max="1" step="1" value="1">
+        <div class="cf-value"><span id="cluster_removal_mode_val">on</span></div>
       </div>
 
       <div class="cf-group">
@@ -393,6 +399,64 @@ function computeRadiusFromCenter(x, y, xc, yc) {
   return r;
 }
 
+function removeClusterOutliersKNN(x, y) {
+  const n = x.length;
+  const k = 10;
+
+  if (n <= k) {
+    return {
+      x: [...x],
+      y: [...y],
+      removedMask: Array(n).fill(false)
+    };
+  }
+
+  const sum10 = [];
+
+  for (let i = 0; i < n; i++) {
+    const distances = [];
+
+    for (let j = 0; j < n; j++) {
+      if (i === j) continue;
+
+      const dx = x[i] - x[j];
+      const dy = y[i] - y[j];
+      distances.push(Math.sqrt(dx * dx + dy * dy));
+    }
+
+    distances.sort((a, b) => a - b);
+
+    let s = 0;
+    for (let m = 0; m < k; m++) {
+      s += distances[m];
+    }
+
+    sum10.push(s);
+  }
+
+  const ttt = median(sum10);
+
+  const removedMask = sum10.map(v => {
+    return (v < (ttt / 4)) || (v > (ttt * 2));
+  });
+
+  const x_clean = [];
+  const y_clean = [];
+
+  for (let i = 0; i < n; i++) {
+    if (!removedMask[i]) {
+      x_clean.push(x[i]);
+      y_clean.push(y[i]);
+    }
+  }
+
+  return {
+    x: x_clean,
+    y: y_clean,
+    removedMask
+  };
+}
+  
 function removeOutliersLocalZScoreProposed(x, y, threshold = 3, window_size = 60, std_window = 60) {
   const xc = mean(x);
   const yc = mean(y);
@@ -602,6 +666,7 @@ function currentParams() {
     a: parseFloat(document.getElementById('a').value),
     b: parseFloat(document.getElementById('b').value),
     cluster_ratio: parseFloat(document.getElementById('cluster_ratio').value),
+    cluster_removal_mode: parseInt(document.getElementById('cluster_removal_mode').value, 10),
     near_ratio: parseFloat(document.getElementById('near_ratio').value)
   };
 }
@@ -617,6 +682,8 @@ function updateSliderValues() {
   document.getElementById('b_val').textContent = document.getElementById('b').value;
   document.getElementById('cluster_ratio_val').textContent = document.getElementById('cluster_ratio').value;
   document.getElementById('near_ratio_val').textContent = document.getElementById('near_ratio').value;
+  document.getElementById('cluster_removal_mode_val').textContent =
+  document.getElementById('cluster_removal_mode').value === "1" ? "on" : "off";
 }
 
 function renderScatter(scatter) {
@@ -742,7 +809,16 @@ function runExperiment(params) {
     cluster_outliers, near_ellipse_outliers, random_outliers, random_seed
   });
 
-  const cleanedSelected = removeOutliersLocalZScoreProposed(data.X, data.Y);
+  let x_for_cleaning = data.X;
+  let y_for_cleaning = data.Y;
+  
+  if (params.cluster_removal_mode === 1) {
+    const clusterCleaned = removeClusterOutliersKNN(data.X, data.Y);
+    x_for_cleaning = clusterCleaned.x;
+    y_for_cleaning = clusterCleaned.y;
+  }
+  
+  const cleanedSelected = removeOutliersLocalZScoreProposed(x_for_cleaning, y_for_cleaning);
   const [x0_sel, y0_sel, r_sel] = fitGeometricLS(cleanedSelected.x, cleanedSelected.y);
 
   const r_ref = (a + b) / 2.0;
