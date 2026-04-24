@@ -812,7 +812,7 @@ function runExperiment(params) {
   const cluster_outliers = Math.floor(n_points * params.cluster_ratio);
   const near_ellipse_outliers = Math.floor(n_points * params.near_ratio);
   const random_outliers = 0;
-  const random_seed = 42;
+  const random_seed = Math.floor(Math.random() * 1000000);
 
   const data = generateSyntheticEllipse({
     xc, yc, a, b, n_points, sigma,
