@@ -812,10 +812,21 @@ function runExperiment(params) {
   let x_for_cleaning = data.X;
   let y_for_cleaning = data.Y;
   
+  let x_cluster_removed = [];
+  let y_cluster_removed = [];
+  
   if (params.cluster_removal_mode === 1) {
     const clusterCleaned = removeClusterOutliersKNN(data.X, data.Y);
+  
     x_for_cleaning = clusterCleaned.x;
     y_for_cleaning = clusterCleaned.y;
+  
+    for (let i = 0; i < data.X.length; i++) {
+      if (clusterCleaned.removedMask[i]) {
+        x_cluster_removed.push(data.X[i]);
+        y_cluster_removed.push(data.Y[i]);
+      }
+    }
   }
   
   const cleanedSelected = removeOutliersLocalZScoreProposed(x_for_cleaning, y_for_cleaning);
@@ -832,9 +843,20 @@ function runExperiment(params) {
     cleanedSelected.y
   );
 
+  const xc_polar = cleanedSelected.xc;
+  const yc_polar = cleanedSelected.yc;
+  
+  const theta_cluster_removed = [];
+  const r_cluster_removed = [];
+  
+  for (let i = 0; i < x_cluster_removed.length; i++) {
+    theta_cluster_removed.push(Math.atan2(y_cluster_removed[i] - yc_polar, x_cluster_removed[i] - xc_polar));
+    r_cluster_removed.push(Math.hypot(x_cluster_removed[i] - xc_polar, y_cluster_removed[i] - yc_polar));
+  }
+  
   const rtData = {
-    theta_sorted: cleanedSelected.theta_sorted,
-    r_sorted: cleanedSelected.r_sorted,
+    theta_sorted: [...cleanedSelected.theta_sorted, ...theta_cluster_removed],
+    r_sorted: [...cleanedSelected.r_sorted, ...r_cluster_removed],
     theta_clean: cleanedSelected.theta_clean,
     r_clean: cleanedSelected.r_clean
   };
