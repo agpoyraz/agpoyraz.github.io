@@ -768,8 +768,8 @@ function renderScatter(scatter) {
       y: scatter.y_cluster_removed,
       mode: 'markers',
       type: 'scatter',
-      name: 'Cluster Outliers',
-      marker: { size: 11, color: '#9467bd', symbol: 'diamond' }
+      name: 'Cluster Outliers (generated)',
+      marker: { size: 13, color: '#8a2be2', symbol: 'diamond', line: { width: 1, color: '#000000' } }
     },
     {
       x: scatter.x_circle_fit,
@@ -777,7 +777,7 @@ function renderScatter(scatter) {
       mode: 'lines',
       type: 'scatter',
       name: 'Fitted Circle',
-      line: { width: 3, color: '#9467bd' }
+      line: { width: 3, color: '#2ca02c' }
     },
     {
       x: [scatter.x_est_center],
