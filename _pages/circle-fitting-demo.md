@@ -760,16 +760,8 @@ function renderScatter(scatter) {
       y: scatter.y_removed,
       mode: 'markers',
       type: 'scatter',
-      name: 'Proposed Outliers',
+      name: 'Outliers',
       marker: { size: 7, color: '#d62728' }
-    },
-    {
-      x: scatter.x_cluster_removed,
-      y: scatter.y_cluster_removed,
-      mode: 'markers',
-      type: 'scatter',
-      name: 'Cluster Outliers',
-      marker: { size: 8, color: '#9467bd', symbol: 'circle-open' }
     },
     {
       x: scatter.x_circle_fit,
@@ -962,6 +954,10 @@ function runExperiment(params) {
     y_iter
   );
 
+  // Cluster removal ile silinen noktaları da aynı kırmızı outlier grubuna ekle.
+  const allRemovedX = [...splitDetected.removedX, ...x_cluster_removed];
+  const allRemovedY = [...splitDetected.removedY, ...y_cluster_removed];
+
   const th = linspace(0, 2 * Math.PI, 400, true);
   const x_circle_fit = th.map(t => x0_sel + r_sel * Math.cos(t));
   const y_circle_fit = th.map(t => y0_sel + r_sel * Math.sin(t));
@@ -980,10 +976,8 @@ function runExperiment(params) {
     scatter: {
       x_kept: splitDetected.keptX,
       y_kept: splitDetected.keptY,
-      x_removed: splitDetected.removedX,
-      y_removed: splitDetected.removedY,
-      x_cluster_removed: x_cluster_removed,
-      y_cluster_removed: y_cluster_removed,
+      x_removed: allRemovedX,
+      y_removed: allRemovedY,
       x_circle_fit,
       y_circle_fit,
       x_est_center: x0_sel,
