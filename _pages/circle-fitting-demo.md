@@ -944,6 +944,8 @@ function runExperiment(params) {
     x_iter,
     y_iter
   );
+  const all_removed_x = [...splitDetected.removedX, ...x_cluster_removed];
+  const all_removed_y = [...splitDetected.removedY, ...y_cluster_removed];
 
   const th = linspace(0, 2 * Math.PI, 400, true);
   const x_circle_fit = th.map(t => x0_sel + r_sel * Math.cos(t));
@@ -963,8 +965,8 @@ function runExperiment(params) {
     scatter: {
       x_kept: splitDetected.keptX,
       y_kept: splitDetected.keptY,
-      x_removed: splitDetected.removedX,
-      y_removed: splitDetected.removedY,
+      x_removed: all_removed_x,
+      y_removed: all_removed_y,
       x_circle_fit,
       y_circle_fit,
       x_est_center: x0_sel,
