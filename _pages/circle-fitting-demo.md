@@ -59,12 +59,16 @@ classes: wide
     margin-bottom: 4px;
   }
 
-  .cf-group input[type="range"],
-  .cf-group button {
+  .cf-group input[type="range"] {
     width: 100%;
     height: 4px;
+  }
+
+  .cf-group button {
+    width: 100%;
     font-size: 0.8rem;
-    padding: 6px;
+    padding: 8px;
+    cursor: pointer;
   }
   
   .cf-group input[type="range"]::-webkit-slider-thumb {
@@ -193,19 +197,7 @@ classes: wide
       </div>
 
       <div class="cf-group">
-        <label for="num_iterations">Number of Iterations</label>
-        <input type="range" id="num_iterations" min="1" max="10" step="1" value="6">
-        <div class="cf-value"><span id="num_iterations_val">6</span></div>
-      </div>
-
-      <div class="cf-group">
-        <label for="removal_ratio_threshold">Max Removal Ratio per Iteration</label>
-        <input type="range" id="removal_ratio_threshold" min="0.01" max="0.30" step="0.01" value="0.10">
-        <div class="cf-value"><span id="removal_ratio_threshold_val">0.10</span></div>
-      </div>
-
-      <div class="cf-group">
-        <label for="threshold">Z-score Threshold</label>
+        <label for="threshold">Proposed Threshold</label>
         <input type="range" id="threshold" min="1" max="6" step="0.1" value="3">
         <div class="cf-value"><span id="threshold_val">3</span></div>
       </div>
@@ -217,9 +209,21 @@ classes: wide
       </div>
 
       <div class="cf-group">
-        <label for="std_window">STD Window</label>
+        <label for="std_window">Std Window</label>
         <input type="range" id="std_window" min="20" max="150" step="5" value="50">
         <div class="cf-value"><span id="std_window_val">50</span></div>
+      </div>
+
+      <div class="cf-group">
+        <label for="num_iterations">Number of Iterations</label>
+        <input type="range" id="num_iterations" min="1" max="12" step="1" value="6">
+        <div class="cf-value"><span id="num_iterations_val">6</span></div>
+      </div>
+
+      <div class="cf-group">
+        <label for="removal_ratio_threshold">Max Removal Ratio per Iteration</label>
+        <input type="range" id="removal_ratio_threshold" min="0.01" max="0.30" step="0.01" value="0.10">
+        <div class="cf-value"><span id="removal_ratio_threshold_val">0.10</span></div>
       </div>
 
       <div class="cf-group cf-row-btns">
@@ -256,14 +260,14 @@ classes: wide
                 <th>Total</th>
                 <th>Removed</th>
                 <th>Remaining</th>
+                <th>Accepted Iter.</th>
+                <th>Stop Reason</th>
                 <th>Estimated xc</th>
                 <th>Estimated yc</th>
                 <th>Estimated r</th>
                 <th>Reference r</th>
                 <th>Center Err</th>
                 <th>Radius Err</th>
-                <th>Accepted Iter.</th>
-                <th>Stop Reason</th>
               </tr>
             </thead>
             <tbody></tbody>
@@ -273,6 +277,7 @@ classes: wide
     </div>
   </div>
 </div>
+
 
 <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
 
@@ -490,7 +495,7 @@ function removeClusterOutliersKNN(x, y) {
   };
 }
   
-function removeOutliersLocalZScoreProposed(x, y, threshold = 3, window_size = 50, std_window = 50) {
+function removeOutliersLocalZScoreProposed(x, y, threshold = 3, window_size = 50, std_window = 50, iter_id = 1) {
   const xc = mean(x);
   const yc = mean(y);
 
@@ -505,45 +510,52 @@ function removeOutliersLocalZScoreProposed(x, y, threshold = 3, window_size = 50
 
   const theta_sorted = idx.map(i => theta[i]);
   const r_sorted = idx.map(i => r[i]);
-  const x_sorted = idx.map(i => x[i]);
-  const y_sorted = idx.map(i => y[i]);
 
   const std_list = [];
   const stride = 20;
-  for (let i = 0; i <= r_sorted.length - std_window; i += stride) {
-    std_list.push(std(r_sorted.slice(i, i + std_window)));
+  const last_start = r_sorted.length - std_window;
+
+  if (last_start >= 0) {
+    for (let i = 0; i <= last_start; i += stride) {
+      std_list.push(std(r_sorted.slice(i, i + std_window)));
+    }
   }
 
-  const global_std = (std_list.length === 0 ? std(r_sorted) : median(std_list)) + 1e-12;
+  let global_std = std_list.length === 0 ? std(r_sorted) : median(std_list);
+  if (global_std < 1e-12) global_std += 1e-12;
 
   const n = r_sorted.length;
   const mask = Array(n).fill(true);
 
   if (n < window_size) {
     const mean_r = mean(r_sorted);
-    const outliers = r_sorted.map(v => Math.abs(v - mean_r) > threshold * global_std);
     for (let i = 0; i < n; i++) {
-      mask[i] = !outliers[i];
+      mask[i] = Math.abs(r_sorted[i] - mean_r) <= threshold * global_std;
     }
   } else {
     for (let i = 0; i <= n - window_size; i++) {
       const window = r_sorted.slice(i, i + window_size);
       const mean_r = mean(window);
-      const outliers = window.map(v => Math.abs(v - mean_r) > threshold * global_std);
 
       for (let j = 0; j < window_size; j++) {
-        mask[i + j] = mask[i + j] && !outliers[j];
+        const isOutlier = Math.abs(window[j] - mean_r) > threshold * global_std;
+        mask[i + j] = mask[i + j] && !isOutlier;
       }
     }
   }
 
   const theta_clean = [];
   const r_clean = [];
+  const theta_removed = [];
+  const r_removed = [];
 
   for (let i = 0; i < n; i++) {
     if (mask[i]) {
       theta_clean.push(theta_sorted[i]);
       r_clean.push(r_sorted[i]);
+    } else {
+      theta_removed.push(theta_sorted[i]);
+      r_removed.push(r_sorted[i]);
     }
   }
 
@@ -555,18 +567,19 @@ function removeOutliersLocalZScoreProposed(x, y, threshold = 3, window_size = 50
     y_filt.push(r_clean[i] * Math.sin(theta_clean[i]) + yc);
   }
 
-  const removedRatio = 1 - (x_filt.length / x.length);
-
   return {
     x: x_filt,
     y: y_filt,
-    theta_sorted: theta_sorted,
-    r_sorted: r_sorted,
-    theta_clean: theta_clean,
-    r_clean: r_clean,
-    xc: xc,
-    yc: yc,
-    removedRatio: removedRatio
+    theta_sorted,
+    r_sorted,
+    theta_clean,
+    r_clean,
+    theta_removed,
+    r_removed,
+    xc,
+    yc,
+    iter_id,
+    removed_ratio: 1 - (x_filt.length / x.length)
   };
 }
 
@@ -674,8 +687,8 @@ function splitDetectedOutliers(allX, allY, filtX, filtY) {
       if (used[j]) continue;
 
       if (
-        Math.abs(allX[i] - filtX[j]) < 1e-9 &&
-        Math.abs(allY[i] - filtY[j]) < 1e-9
+        Math.abs(allX[i] - filtX[j]) < 1e-6 &&
+        Math.abs(allY[i] - filtY[j]) < 1e-6
       ) {
         foundIndex = j;
         break;
@@ -704,11 +717,11 @@ function currentParams() {
     cluster_ratio: parseFloat(document.getElementById('cluster_ratio').value),
     cluster_removal_mode: parseInt(document.getElementById('cluster_removal_mode').value, 10),
     near_ratio: parseFloat(document.getElementById('near_ratio').value),
-    num_iterations: parseInt(document.getElementById('num_iterations').value, 10),
-    removal_ratio_threshold: parseFloat(document.getElementById('removal_ratio_threshold').value),
     threshold: parseFloat(document.getElementById('threshold').value),
     window_size: parseInt(document.getElementById('window_size').value, 10),
-    std_window: parseInt(document.getElementById('std_window').value, 10)
+    std_window: parseInt(document.getElementById('std_window').value, 10),
+    num_iterations: parseInt(document.getElementById('num_iterations').value, 10),
+    removal_ratio_threshold: parseFloat(document.getElementById('removal_ratio_threshold').value)
   };
 }
 
@@ -723,13 +736,13 @@ function updateSliderValues() {
   document.getElementById('b_val').textContent = document.getElementById('b').value;
   document.getElementById('cluster_ratio_val').textContent = document.getElementById('cluster_ratio').value;
   document.getElementById('near_ratio_val').textContent = document.getElementById('near_ratio').value;
-  document.getElementById('cluster_removal_mode_val').textContent =
-    document.getElementById('cluster_removal_mode').value === "1" ? "on" : "off";
-  document.getElementById('num_iterations_val').textContent = document.getElementById('num_iterations').value;
-  document.getElementById('removal_ratio_threshold_val').textContent = document.getElementById('removal_ratio_threshold').value;
   document.getElementById('threshold_val').textContent = document.getElementById('threshold').value;
   document.getElementById('window_size_val').textContent = document.getElementById('window_size').value;
   document.getElementById('std_window_val').textContent = document.getElementById('std_window').value;
+  document.getElementById('num_iterations_val').textContent = document.getElementById('num_iterations').value;
+  document.getElementById('removal_ratio_threshold_val').textContent = document.getElementById('removal_ratio_threshold').value;
+  document.getElementById('cluster_removal_mode_val').textContent =
+    document.getElementById('cluster_removal_mode').value === "1" ? "on" : "off";
 }
 
 function renderScatter(scatter) {
@@ -747,8 +760,16 @@ function renderScatter(scatter) {
       y: scatter.y_removed,
       mode: 'markers',
       type: 'scatter',
-      name: 'Outliers',
+      name: 'Proposed Outliers',
       marker: { size: 7, color: '#d62728' }
+    },
+    {
+      x: scatter.x_cluster_removed,
+      y: scatter.y_cluster_removed,
+      mode: 'markers',
+      type: 'scatter',
+      name: 'Cluster Outliers',
+      marker: { size: 8, color: '#9467bd', symbol: 'circle-open' }
     },
     {
       x: scatter.x_circle_fit,
@@ -821,14 +842,14 @@ function appendResultRow(data, params) {
     <td>${data.counts.total}</td>
     <td>${data.counts.removed}</td>
     <td>${data.counts.remaining}</td>
+    <td>${data.iteration_info.accepted_iterations}</td>
+    <td>${data.iteration_info.stop_reason}</td>
     <td>${data.selected_result.x0.toFixed(4)}</td>
     <td>${data.selected_result.y0.toFixed(4)}</td>
     <td>${data.selected_result.r.toFixed(4)}</td>
     <td>${data.selected_result.r_ref.toFixed(4)}</td>
     <td>${data.selected_result.center_error.toFixed(4)}</td>
     <td>${data.selected_result.radius_error.toFixed(4)}</td>
-    <td>${data.iteration_info.accepted_iterations}</td>
-    <td>${data.iteration_info.stop_reason}</td>
   `;
 
   tbody.appendChild(tr);
@@ -857,54 +878,75 @@ function runExperiment(params) {
     cluster_outliers, near_ellipse_outliers, random_outliers, random_seed
   });
 
-  let x_work = [...data.X];
-  let y_work = [...data.Y];
+  let x_for_cleaning = data.X;
+  let y_for_cleaning = data.Y;
+  let x_cluster_removed = [];
+  let y_cluster_removed = [];
 
   if (params.cluster_removal_mode === 1) {
-    const clusterCleaned = removeClusterOutliersKNN(x_work, y_work);
-    x_work = clusterCleaned.x;
-    y_work = clusterCleaned.y;
+    const clusterCleaned = removeClusterOutliersKNN(data.X, data.Y);
+    x_for_cleaning = clusterCleaned.x;
+    y_for_cleaning = clusterCleaned.y;
+
+    for (let i = 0; i < data.X.length; i++) {
+      if (clusterCleaned.removedMask[i]) {
+        x_cluster_removed.push(data.X[i]);
+        y_cluster_removed.push(data.Y[i]);
+      }
+    }
   }
 
-  let x_iter = [...x_work];
-  let y_iter = [...y_work];
+  let x_iter = x_for_cleaning;
+  let y_iter = y_for_cleaning;
   let lastAccepted = null;
+  let attemptedRejected = null;
   let acceptedIterations = 0;
-  let stopReason = "max_iterations";
+  let stopReason = "max iteration";
 
   for (let iter = 1; iter <= params.num_iterations; iter++) {
-    const resultIter = removeOutliersLocalZScoreProposed(
+    const candidate = removeOutliersLocalZScoreProposed(
       x_iter,
       y_iter,
       params.threshold,
       params.window_size,
-      params.std_window
+      params.std_window,
+      iter
     );
 
-    if (resultIter.removedRatio > params.removal_ratio_threshold) {
-      stopReason = `iteration_${iter}_ignored_ratio_${resultIter.removedRatio.toFixed(3)}`;
+    if (candidate.removed_ratio > params.removal_ratio_threshold) {
+      attemptedRejected = candidate;
+      stopReason = `iter ${iter} rejected`;
       break;
     }
 
-    x_iter = resultIter.x;
-    y_iter = resultIter.y;
-    lastAccepted = resultIter;
+    x_iter = candidate.x;
+    y_iter = candidate.y;
+    lastAccepted = candidate;
     acceptedIterations += 1;
+
+    if (candidate.removed_ratio <= 0) {
+      stopReason = "no removal";
+      break;
+    }
   }
 
-  if (!lastAccepted) {
-    lastAccepted = removeOutliersLocalZScoreProposed(
-      x_iter,
-      y_iter,
+  if (lastAccepted === null) {
+    lastAccepted = attemptedRejected || removeOutliersLocalZScoreProposed(
+      x_for_cleaning,
+      y_for_cleaning,
       params.threshold,
       params.window_size,
-      params.std_window
+      params.std_window,
+      1
     );
-    stopReason = "first_iteration_ignored";
-  }
 
-  if (x_iter.length < 5) {
-    throw new Error("Too few points remained after filtering.");
+    if (attemptedRejected !== null) {
+      x_iter = x_for_cleaning;
+      y_iter = y_for_cleaning;
+    } else {
+      x_iter = lastAccepted.x;
+      y_iter = lastAccepted.y;
+    }
   }
 
   const [x0_sel, y0_sel, r_sel] = fitGeometricLS(x_iter, y_iter);
@@ -913,11 +955,9 @@ function runExperiment(params) {
   const center_error_sel = Math.hypot(x0_sel - xc, y0_sel - yc);
   const radius_error_sel = Math.abs(r_sel - r_ref);
 
-  // Final kalan noktaları ham veriye göre karşılaştırıyoruz.
-  // Böylece cluster removal + proposed removal ile silinen tüm noktalar tek kırmızı grupta görünür.
   const splitDetected = splitDetectedOutliers(
-    data.X,
-    data.Y,
+    x_for_cleaning,
+    y_for_cleaning,
     x_iter,
     y_iter
   );
@@ -942,6 +982,8 @@ function runExperiment(params) {
       y_kept: splitDetected.keptY,
       x_removed: splitDetected.removedX,
       y_removed: splitDetected.removedY,
+      x_cluster_removed: x_cluster_removed,
+      y_cluster_removed: y_cluster_removed,
       x_circle_fit,
       y_circle_fit,
       x_est_center: x0_sel,
@@ -972,7 +1014,7 @@ function runDemo() {
     renderScatter(result.scatter);
     renderRTheta(result.rtheta);
     appendResultRow(result, params);
-    setStatus(`Completed. Removed: ${result.counts.removed}. Accepted iterations: ${result.iteration_info.accepted_iterations}. Stop: ${result.iteration_info.stop_reason}.`);
+    setStatus(`Completed. Accepted iterations: ${result.iteration_info.accepted_iterations}. Stop: ${result.iteration_info.stop_reason}.`);
   } catch (err) {
     console.error(err);
     setStatus("Error: " + err.message);
