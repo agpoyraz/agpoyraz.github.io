@@ -769,7 +769,7 @@ function renderScatter(scatter) {
       mode: 'markers',
       type: 'scatter',
       name: 'Cluster Outliers',
-      marker: { size: 8, color: '#d62728', symbol: 'circle' }
+      marker: { size: 8, color: '#9467bd', symbol: 'circle-open' }
     },
     {
       x: scatter.x_circle_fit,
@@ -804,15 +804,23 @@ function renderRTheta(rtheta) {
       y: rtheta.r_sorted,
       mode: 'markers',
       type: 'scatter',
-      name: 'Outlier',
+      name: 'Proposed Outliers',
       marker: { size: 4, color: '#d62728' }
+    },
+    {
+      x: rtheta.theta_cluster_removed,
+      y: rtheta.r_cluster_removed,
+      mode: 'markers',
+      type: 'scatter',
+      name: 'Cluster Outlier Removal',
+      marker: { size: 8, color: '#d62728', symbol: 'circle-open' }
     },
     {
       x: rtheta.theta_clean,
       y: rtheta.r_clean,
       mode: 'markers',
       type: 'scatter',
-      name: 'Original',
+      name: 'Filtered Points',
       marker: { size: 4, color: '#1f77b4' }
     }
   ];
@@ -966,6 +974,13 @@ function runExperiment(params) {
   const x_circle_fit = th.map(t => x0_sel + r_sel * Math.cos(t));
   const y_circle_fit = th.map(t => y0_sel + r_sel * Math.sin(t));
 
+  const theta_cluster_removed = [];
+  const r_cluster_removed = [];
+  for (let i = 0; i < x_cluster_removed.length; i++) {
+    theta_cluster_removed.push(Math.atan2(y_cluster_removed[i] - lastAccepted.yc, x_cluster_removed[i] - lastAccepted.xc));
+    r_cluster_removed.push(Math.hypot(x_cluster_removed[i] - lastAccepted.xc, y_cluster_removed[i] - lastAccepted.yc));
+  }
+
   return {
     counts: {
       total: data.X.length,
@@ -993,7 +1008,9 @@ function runExperiment(params) {
       theta_sorted: lastAccepted.theta_sorted,
       r_sorted: lastAccepted.r_sorted,
       theta_clean: lastAccepted.theta_clean,
-      r_clean: lastAccepted.r_clean
+      r_clean: lastAccepted.r_clean,
+      theta_cluster_removed,
+      r_cluster_removed
     },
     selected_result: {
       x0: x0_sel,
