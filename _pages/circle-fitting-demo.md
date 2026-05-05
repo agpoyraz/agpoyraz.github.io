@@ -769,7 +769,7 @@ function renderScatter(scatter) {
       mode: 'markers',
       type: 'scatter',
       name: 'Cluster Outliers',
-      marker: { size: 8, color: '#9467bd', symbol: 'circle-open' }
+      marker: { size: 11, color: '#9467bd', symbol: 'diamond' }
     },
     {
       x: scatter.x_circle_fit,
@@ -982,8 +982,12 @@ function runExperiment(params) {
       y_kept: splitDetected.keptY,
       x_removed: splitDetected.removedX,
       y_removed: splitDetected.removedY,
-      x_cluster_removed: x_cluster_removed,
-      y_cluster_removed: y_cluster_removed,
+      // MATLAB'daki x_out_cluster/y_out_cluster gibi üretilen gerçek cluster outlierları göster.
+      // Böylece KNN yakalamasa bile cluster noktaları grafikte mor olarak görünür.
+      x_cluster_removed: data.x_out_cluster,
+      y_cluster_removed: data.y_out_cluster,
+      x_cluster_detected: x_cluster_removed,
+      y_cluster_detected: y_cluster_removed,
       x_circle_fit,
       y_circle_fit,
       x_est_center: x0_sel,
@@ -1014,7 +1018,7 @@ function runDemo() {
     renderScatter(result.scatter);
     renderRTheta(result.rtheta);
     appendResultRow(result, params);
-    setStatus(`Completed. Accepted iterations: ${result.iteration_info.accepted_iterations}. Stop: ${result.iteration_info.stop_reason}.`);
+    setStatus(`Completed. Cluster shown: ${result.scatter.x_cluster_removed.length}. Cluster detected by KNN: ${result.scatter.x_cluster_detected.length}. Accepted iterations: ${result.iteration_info.accepted_iterations}. Stop: ${result.iteration_info.stop_reason}.`);
   } catch (err) {
     console.error(err);
     setStatus("Error: " + err.message);
