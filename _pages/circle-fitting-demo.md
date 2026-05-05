@@ -687,8 +687,8 @@ function splitDetectedOutliers(allX, allY, filtX, filtY) {
       if (used[j]) continue;
 
       if (
-        Math.abs(allX[i] - filtX[j]) < 1e-9 &&
-        Math.abs(allY[i] - filtY[j]) < 1e-9
+        Math.abs(allX[i] - filtX[j]) < 1e-6 &&
+        Math.abs(allY[i] - filtY[j]) < 1e-6
       ) {
         foundIndex = j;
         break;
@@ -760,8 +760,16 @@ function renderScatter(scatter) {
       y: scatter.y_removed,
       mode: 'markers',
       type: 'scatter',
-      name: 'Outliers',
+      name: 'Proposed Outliers',
       marker: { size: 7, color: '#d62728' }
+    },
+    {
+      x: scatter.x_cluster_removed,
+      y: scatter.y_cluster_removed,
+      mode: 'markers',
+      type: 'scatter',
+      name: 'Cluster Outliers',
+      marker: { size: 8, color: '#9467bd', symbol: 'circle-open' }
     },
     {
       x: scatter.x_circle_fit,
@@ -872,11 +880,20 @@ function runExperiment(params) {
 
   let x_for_cleaning = data.X;
   let y_for_cleaning = data.Y;
+  let x_cluster_removed = [];
+  let y_cluster_removed = [];
 
   if (params.cluster_removal_mode === 1) {
     const clusterCleaned = removeClusterOutliersKNN(data.X, data.Y);
     x_for_cleaning = clusterCleaned.x;
     y_for_cleaning = clusterCleaned.y;
+
+    for (let i = 0; i < data.X.length; i++) {
+      if (clusterCleaned.removedMask[i]) {
+        x_cluster_removed.push(data.X[i]);
+        y_cluster_removed.push(data.Y[i]);
+      }
+    }
   }
 
   let x_iter = x_for_cleaning;
@@ -939,13 +956,11 @@ function runExperiment(params) {
   const radius_error_sel = Math.abs(r_sel - r_ref);
 
   const splitDetected = splitDetectedOutliers(
-    data.X,
-    data.Y,
+    x_for_cleaning,
+    y_for_cleaning,
     x_iter,
     y_iter
   );
-  const all_removed_x = [...splitDetected.removedX, ...x_cluster_removed];
-  const all_removed_y = [...splitDetected.removedY, ...y_cluster_removed];
 
   const th = linspace(0, 2 * Math.PI, 400, true);
   const x_circle_fit = th.map(t => x0_sel + r_sel * Math.cos(t));
@@ -965,8 +980,10 @@ function runExperiment(params) {
     scatter: {
       x_kept: splitDetected.keptX,
       y_kept: splitDetected.keptY,
-      x_removed: all_removed_x,
-      y_removed: all_removed_y,
+      x_removed: splitDetected.removedX,
+      y_removed: splitDetected.removedY,
+      x_cluster_removed: x_cluster_removed,
+      y_cluster_removed: y_cluster_removed,
       x_circle_fit,
       y_circle_fit,
       x_est_center: x0_sel,
