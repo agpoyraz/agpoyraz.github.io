@@ -673,6 +673,23 @@ function plotRThetaArrays(x, y) {
   };
 }
 
+function polarFromCenter(x, y, xc, yc) {
+  const data = [];
+
+  for (let i = 0; i < x.length; i++) {
+    const th = Math.atan2(y[i] - yc, x[i] - xc);
+    const rr = Math.hypot(x[i] - xc, y[i] - yc);
+    data.push({ th, rr });
+  }
+
+  data.sort((a, b) => a.th - b.th);
+
+  return {
+    theta: data.map(v => v.th),
+    r: data.map(v => v.rr)
+  };
+}
+
 function splitDetectedOutliers(allX, allY, filtX, filtY) {
   const removedX = [];
   const removedY = [];
@@ -760,16 +777,8 @@ function renderScatter(scatter) {
       y: scatter.y_removed,
       mode: 'markers',
       type: 'scatter',
-      name: 'Proposed Outliers',
+      name: 'Removed Outliers',
       marker: { size: 7, color: '#d62728' }
-    },
-    {
-      x: scatter.x_cluster_removed,
-      y: scatter.y_cluster_removed,
-      mode: 'markers',
-      type: 'scatter',
-      name: 'Cluster Outliers',
-      marker: { size: 8, color: '#9467bd', symbol: 'circle-open' }
     },
     {
       x: scatter.x_circle_fit,
@@ -804,23 +813,15 @@ function renderRTheta(rtheta) {
       y: rtheta.r_sorted,
       mode: 'markers',
       type: 'scatter',
-      name: 'Proposed Outliers',
+      name: 'Outlier',
       marker: { size: 4, color: '#d62728' }
-    },
-    {
-      x: rtheta.theta_cluster_removed,
-      y: rtheta.r_cluster_removed,
-      mode: 'markers',
-      type: 'scatter',
-      name: 'Cluster Outlier Removal',
-      marker: { size: 8, color: '#d62728', symbol: 'circle-open' }
     },
     {
       x: rtheta.theta_clean,
       y: rtheta.r_clean,
       mode: 'markers',
       type: 'scatter',
-      name: 'Filtered Points',
+      name: 'Original',
       marker: { size: 4, color: '#1f77b4' }
     }
   ];
@@ -911,6 +912,10 @@ function runExperiment(params) {
   let acceptedIterations = 0;
   let stopReason = "max iteration";
 
+  // Cumulative proposed removal list: accepted iterations only.
+  const x_proposed_removed_all = [];
+  const y_proposed_removed_all = [];
+
   for (let iter = 1; iter <= params.num_iterations; iter++) {
     const candidate = removeOutliersLocalZScoreProposed(
       x_iter,
@@ -926,6 +931,17 @@ function runExperiment(params) {
       stopReason = `iter ${iter} rejected`;
       break;
     }
+
+    // Points removed in this accepted iteration are accumulated for display.
+    const removedThisIter = splitDetectedOutliers(
+      x_iter,
+      y_iter,
+      candidate.x,
+      candidate.y
+    );
+
+    x_proposed_removed_all.push(...removedThisIter.removedX);
+    y_proposed_removed_all.push(...removedThisIter.removedY);
 
     x_iter = candidate.x;
     y_iter = candidate.y;
@@ -954,6 +970,15 @@ function runExperiment(params) {
     } else {
       x_iter = lastAccepted.x;
       y_iter = lastAccepted.y;
+
+      const removedFirst = splitDetectedOutliers(
+        x_for_cleaning,
+        y_for_cleaning,
+        x_iter,
+        y_iter
+      );
+      x_proposed_removed_all.push(...removedFirst.removedX);
+      y_proposed_removed_all.push(...removedFirst.removedY);
     }
   }
 
@@ -963,23 +988,16 @@ function runExperiment(params) {
   const center_error_sel = Math.hypot(x0_sel - xc, y0_sel - yc);
   const radius_error_sel = Math.abs(r_sel - r_ref);
 
-  const splitDetected = splitDetectedOutliers(
-    x_for_cleaning,
-    y_for_cleaning,
-    x_iter,
-    y_iter
-  );
+  // All points removed from the original input are shown together in red.
+  const x_removed_all = [...x_cluster_removed, ...x_proposed_removed_all];
+  const y_removed_all = [...y_cluster_removed, ...y_proposed_removed_all];
 
   const th = linspace(0, 2 * Math.PI, 400, true);
   const x_circle_fit = th.map(t => x0_sel + r_sel * Math.cos(t));
   const y_circle_fit = th.map(t => y0_sel + r_sel * Math.sin(t));
 
-  const theta_cluster_removed = [];
-  const r_cluster_removed = [];
-  for (let i = 0; i < x_cluster_removed.length; i++) {
-    theta_cluster_removed.push(Math.atan2(y_cluster_removed[i] - lastAccepted.yc, x_cluster_removed[i] - lastAccepted.xc));
-    r_cluster_removed.push(Math.hypot(x_cluster_removed[i] - lastAccepted.xc, y_cluster_removed[i] - lastAccepted.yc));
-  }
+  const keptPolar = polarFromCenter(x_iter, y_iter, x0_sel, y0_sel);
+  const removedPolar = polarFromCenter(x_removed_all, y_removed_all, x0_sel, y0_sel);
 
   return {
     counts: {
@@ -993,24 +1011,20 @@ function runExperiment(params) {
       stop_reason: stopReason
     },
     scatter: {
-      x_kept: splitDetected.keptX,
-      y_kept: splitDetected.keptY,
-      x_removed: splitDetected.removedX,
-      y_removed: splitDetected.removedY,
-      x_cluster_removed: x_cluster_removed,
-      y_cluster_removed: y_cluster_removed,
+      x_kept: x_iter,
+      y_kept: y_iter,
+      x_removed: x_removed_all,
+      y_removed: y_removed_all,
       x_circle_fit,
       y_circle_fit,
       x_est_center: x0_sel,
       y_est_center: y0_sel
     },
     rtheta: {
-      theta_sorted: lastAccepted.theta_sorted,
-      r_sorted: lastAccepted.r_sorted,
-      theta_clean: lastAccepted.theta_clean,
-      r_clean: lastAccepted.r_clean,
-      theta_cluster_removed,
-      r_cluster_removed
+      theta_sorted: removedPolar.theta,
+      r_sorted: removedPolar.r,
+      theta_clean: keptPolar.theta,
+      r_clean: keptPolar.r
     },
     selected_result: {
       x0: x0_sel,
@@ -1022,7 +1036,6 @@ function runExperiment(params) {
     }
   };
 }
-
 function runDemo() {
   try {
     setStatus("Running...");
@@ -1031,7 +1044,7 @@ function runDemo() {
     renderScatter(result.scatter);
     renderRTheta(result.rtheta);
     appendResultRow(result, params);
-    setStatus(`Completed. Accepted iterations: ${result.iteration_info.accepted_iterations}. Stop: ${result.iteration_info.stop_reason}.`);
+    setStatus(`Completed. Accepted iterations: ${result.iteration_info.accepted_iterations}. Stop: ${result.iteration_info.stop_reason}. Removed shown: ${result.scatter.x_removed.length}.`);
   } catch (err) {
     console.error(err);
     setStatus("Error: " + err.message);
