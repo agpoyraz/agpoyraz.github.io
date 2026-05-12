@@ -931,26 +931,11 @@ function runExperiment(params) {
       iter
     );
 
-  if (candidate.removed_ratio > params.removal_ratio_threshold) {
-  
-    // İlk iterasyonda threshold aşılırsa:
-    // sonucu kabul et ama iterasyonu durdur
-    if (iter === 1) {
-      x_iter = candidate.x;
-      y_iter = candidate.y;
-  
-      lastAccepted = candidate;
-      acceptedIterations += 1;
-  
-      stopReason = `iter ${iter} accepted then stopped`;
-    }
-    else {
+    if (candidate.removed_ratio > params.removal_ratio_threshold) {
       attemptedRejected = candidate;
       stopReason = `iter ${iter} rejected`;
+      break;
     }
-  
-    break;
-  }
 
     x_iter = candidate.x;
     y_iter = candidate.y;
