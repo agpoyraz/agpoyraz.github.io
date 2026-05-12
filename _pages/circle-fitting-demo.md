@@ -932,8 +932,16 @@ function runExperiment(params) {
     );
 
     if (candidate.removed_ratio > params.removal_ratio_threshold) {
-      attemptedRejected = candidate;
-      stopReason = `iter ${iter} rejected`;
+      if (iter === 1) {
+        x_iter = candidate.x;
+        y_iter = candidate.y;
+        lastAccepted = candidate;
+        acceptedIterations += 1;
+        stopReason = `iter ${iter} accepted then stopped`;
+      } else {
+        attemptedRejected = candidate;
+        stopReason = `iter ${iter} rejected`;
+      }
       break;
     }
 
