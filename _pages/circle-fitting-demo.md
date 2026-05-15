@@ -535,10 +535,10 @@ function removeOutliersLocalZScoreProposed(x, y, threshold = 3, window_size = 50
   } else {
     for (let i = 0; i <= n - window_size; i++) {
       const window = r_sorted.slice(i, i + window_size);
-      const mean_r = mean(window);
+      const median_r = median(window);
 
       for (let j = 0; j < window_size; j++) {
-        const isOutlier = Math.abs(window[j] - mean_r) > threshold * global_std;
+        const isOutlier = Math.abs(window[j] - median_r) > threshold * global_std;
         mask[i + j] = mask[i + j] && !isOutlier;
       }
     }
