@@ -167,15 +167,31 @@ classes: wide
       </div>
 
       <div class="cf-group">
-        <label for="a">a</label>
-        <input type="range" id="a" min="670" max="690" step="1" value="682">
-        <div class="cf-value"><span id="a_val">682</span></div>
+        <label for="base_radius">Base Radius</label>
+        <input type="range"
+               id="base_radius"
+               min="100"
+               max="1000"
+               step="1"
+               value="680">
+      
+        <div class="cf-value">
+          <span id="base_radius_val">680</span>
+        </div>
       </div>
 
       <div class="cf-group">
-        <label for="b">b</label>
-        <input type="range" id="b" min="670" max="690" step="1" value="678">
-        <div class="cf-value"><span id="b_val">678</span></div>
+        <label for="ellipticity">Ellipticity</label>
+        <input type="range"
+               id="ellipticity"
+               min="0"
+               max="10"
+               step="1"
+               value="0">
+      
+        <div class="cf-value">
+          <span id="ellipticity_val">0</span>
+        </div>
       </div>
 
       <div class="cf-group">
@@ -253,8 +269,8 @@ classes: wide
                 <th>#</th>
                 <th>Sigma</th>
                 <th>n_points</th>
-                <th>a</th>
-                <th>b</th>
+                <th>Base Radius</th>
+                <th>Ellipticity</th>
                 <th>Cluster Ratio</th>
                 <th>Near Ratio</th>
                 <th>Total</th>
@@ -712,8 +728,8 @@ function currentParams() {
   return {
     sigma: parseFloat(document.getElementById('sigma').value),
     n_points: parseInt(document.getElementById('n_points').value, 10),
-    a: parseFloat(document.getElementById('a').value),
-    b: parseFloat(document.getElementById('b').value),
+    base_radius: parseFloat(document.getElementById('base_radius').value),
+    ellipticity: parseFloat(document.getElementById('ellipticity').value),
     cluster_ratio: parseFloat(document.getElementById('cluster_ratio').value),
     cluster_removal_mode: parseInt(document.getElementById('cluster_removal_mode').value, 10),
     near_ratio: parseFloat(document.getElementById('near_ratio').value),
@@ -732,8 +748,8 @@ function setStatus(msg) {
 function updateSliderValues() {
   document.getElementById('sigma_val').textContent = document.getElementById('sigma').value;
   document.getElementById('n_points_val').textContent = document.getElementById('n_points').value;
-  document.getElementById('a_val').textContent = document.getElementById('a').value;
-  document.getElementById('b_val').textContent = document.getElementById('b').value;
+  document.getElementById('base_radius_val').textContent = document.getElementById('base_radius').value;
+  document.getElementById('ellipticity_val').textContent = document.getElementById('ellipticity').value;
   document.getElementById('cluster_ratio_val').textContent = document.getElementById('cluster_ratio').value;
   document.getElementById('near_ratio_val').textContent = document.getElementById('near_ratio').value;
   document.getElementById('threshold_val').textContent = document.getElementById('threshold').value;
@@ -835,8 +851,8 @@ function appendResultRow(data, params) {
     <td>${runCounter}</td>
     <td>${params.sigma.toFixed(2)}</td>
     <td>${params.n_points}</td>
-    <td>${params.a.toFixed(0)}</td>
-    <td>${params.b.toFixed(0)}</td>
+    <td>${params.base_radius.toFixed(0)}</td>
+    <td>${params.ellipticity.toFixed(0)}</td>
     <td>${params.cluster_ratio.toFixed(3)}</td>
     <td>${params.near_ratio.toFixed(3)}</td>
     <td>${data.counts.total}</td>
@@ -881,8 +897,8 @@ function polarFromXY(x, y, xc, yc) {
 function runExperiment(params) {
   const xc = 500;
   const yc = 500;
-  const a = params.a;
-  const b = params.b;
+  const a = params.base_radius - params.ellipticity;
+  const b = params.base_radius + params.ellipticity;
   const n_points = params.n_points;
   const sigma = params.sigma;
 
