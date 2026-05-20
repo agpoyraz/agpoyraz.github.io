@@ -33,7 +33,7 @@ classes: wide
 
   .cf-grid {
     display: grid;
-    grid-template-columns: 320px minmax(0, 1fr);
+    grid-template-columns: 260px minmax(0, 1fr);
     gap: 24px;
     align-items: start;
   }
@@ -44,24 +44,26 @@ classes: wide
     position: sticky;
     top: 20px;
     background: #fff;
-    padding: 12px;
-    font-size: 0.85rem;
+    padding: px;
+    font-size: 0.78rem;
   }
 
   .cf-group {
-    margin-bottom: 10px;
+    margin-bottom: 4px;
   }
-
+  
   .cf-group label {
     display: block;
     font-weight: 600;
-    font-size: 0.8rem;
-    margin-bottom: 4px;
+    font-size: 0.72rem;
+    margin-bottom: 1px;
+    line-height: 1.1;
   }
 
   .cf-group input[type="range"] {
     width: 100%;
-    height: 4px;
+    height: 2px;
+    margin: 0;
   }
 
   .cf-group button {
@@ -77,8 +79,9 @@ classes: wide
   }
 
   .cf-value {
-    font-size: 0.75rem;
+    font-size: 0.65rem;
     color: #555;
+    line-height: 1;
   }
 
   .cf-note {
