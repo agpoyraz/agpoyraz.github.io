@@ -779,8 +779,8 @@ function renderScatter(scatter) {
       y: scatter.y_removed,
       mode: 'markers',
       type: 'scatter',
-      name: 'Proposed Outliers',
-      marker: { size: 7, color: '#d62728' }
+      name: 'Near Outliers',
+      marker: { size: 7, color: 'orange' }
     },
     {
       x: scatter.x_cluster_removed,
