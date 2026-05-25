@@ -933,7 +933,7 @@ function runExperiment(params) {
   let y_for_cleaning = data.Y;
   let x_cluster_removed = [];
   let y_cluster_removed = [];
-  // None case: fitting before any outlier removal
+  
   const [x0_none, y0_none, r_none] = fitGeometricLS(data.X, data.Y);
   const none_radius_error = Math.abs(r_none - ((a + b) / 2.0));
 
