@@ -630,44 +630,56 @@ function fitTaubin(x, y) {
   return [xc, yc, r];
 }
 
-function fitGeometricLS(x, y, iterations = 12) {
-  let [xc, yc, r] = fitTaubin(x, y);
+function fitGeometricLS(x, y, iterations = 100) {
+  let xc = mean(x);
+  let yc = mean(y);
 
   for (let it = 0; it < iterations; it++) {
-    let J11 = 0, J12 = 0, J13 = 0, J22 = 0, J23 = 0, J33 = x.length;
-    let B1 = 0, B2 = 0, B3 = 0;
+    const Ri = [];
+
+    for (let i = 0; i < x.length; i++) {
+      Ri.push(Math.hypot(x[i] - xc, y[i] - yc));
+    }
+
+    const rMean = mean(Ri);
+
+    let J11 = 0, J12 = 0;
+    let J22 = 0;
+    let B1 = 0, B2 = 0;
 
     for (let i = 0; i < x.length; i++) {
       const dx = xc - x[i];
       const dy = yc - y[i];
-      const di = Math.sqrt(dx * dx + dy * dy) + 1e-12;
-      const fi = di - r;
+      const di = Ri[i] + 1e-12;
+
+      const fi = Ri[i] - rMean;
 
       const j1 = dx / di;
       const j2 = dy / di;
-      const j3 = -1;
 
       J11 += j1 * j1;
       J12 += j1 * j2;
-      J13 += j1 * j3;
       J22 += j2 * j2;
-      J23 += j2 * j3;
+
       B1 += j1 * fi;
       B2 += j2 * fi;
-      B3 += j3 * fi;
     }
 
-    const delta = solve3x3(
-      [[J11, J12, J13], [J12, J22, J23], [J13, J23, J33]],
-      [-B1, -B2, -B3]
+    const delta = solve2x2(
+      [[J11, J12], [J12, J22]],
+      [-B1, -B2]
     );
 
     xc += delta[0];
     yc += delta[1];
-    r += delta[2];
 
-    if (Math.abs(delta[0]) + Math.abs(delta[1]) + Math.abs(delta[2]) < 1e-6) break;
+    if (Math.abs(delta[0]) + Math.abs(delta[1]) < 1e-6) {
+      break;
+    }
   }
+
+  const R = computeRadiusFromCenter(x, y, xc, yc);
+  const r = mean(R);
 
   return [xc, yc, r];
 }
