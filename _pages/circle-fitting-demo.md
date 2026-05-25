@@ -287,7 +287,6 @@ classes: wide
                 <th>Reference r</th>
                 <th>Center Err</th>
                 <th>Radius Err</th>
-                <th>None Radius Err</th>
               </tr>
             </thead>
             <tbody></tbody>
@@ -882,11 +881,6 @@ function appendResultRow(data, params) {
     <td>${data.selected_result.r_ref.toFixed(4)}</td>
     <td>${data.selected_result.center_error.toFixed(4)}</td>
     <td>${data.selected_result.radius_error.toFixed(4)}</td>
-    <td>${
-      Number.isFinite(data.selected_result.none_radius_error)
-        ? data.selected_result.none_radius_error.toFixed(4)
-        : 'NaN'
-    }</td>
   `;
 
   tbody.appendChild(tr);
@@ -938,15 +932,6 @@ function runExperiment(params) {
   let x_cluster_removed = [];
   let y_cluster_removed = [];
   
-  let none_radius_error = NaN;
-
-  try {
-    const [x0_none, y0_none, r_none] = fitGeometricLS(data.X, data.Y);
-    none_radius_error = Math.abs(r_none - ((a + b) / 2.0));
-  } catch (e) {
-    console.warn("None Geometric LS failed:", e);
-    none_radius_error = NaN;
-  }
 
   if (params.cluster_removal_mode === 1) {
     const clusterCleaned = removeClusterOutliersKNN(data.X, data.Y);
@@ -1084,8 +1069,7 @@ function runExperiment(params) {
       r: r_sel,
       r_ref: r_ref,
       center_error: center_error_sel,
-      radius_error: radius_error_sel,
-      none_radius_error: none_radius_error
+      radius_error: radius_error_sel
     }
   };
 }
