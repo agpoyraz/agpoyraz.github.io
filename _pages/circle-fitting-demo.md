@@ -165,7 +165,7 @@ classes: wide
 
       <div class="cf-group">
         <label for="n_points">n_points</label>
-        <input type="range" id="n_points" min="500" max="3000" step="50" value="1000">
+        <input type="range" id="n_points" min="500" max="5000" step="50" value="1000">
         <div class="cf-value"><span id="n_points_val">1000</span></div>
       </div>
 
