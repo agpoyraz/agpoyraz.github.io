@@ -287,6 +287,7 @@ classes: wide
                 <th>Reference r</th>
                 <th>Center Err</th>
                 <th>Radius Err</th>
+                <th>None Radius Err</th>
               </tr>
             </thead>
             <tbody></tbody>
@@ -881,6 +882,7 @@ function appendResultRow(data, params) {
     <td>${data.selected_result.r_ref.toFixed(4)}</td>
     <td>${data.selected_result.center_error.toFixed(4)}</td>
     <td>${data.selected_result.radius_error.toFixed(4)}</td>
+    <td>${data.selected_result.none_radius_error.toFixed(4)}</td>
   `;
 
   tbody.appendChild(tr);
@@ -931,6 +933,9 @@ function runExperiment(params) {
   let y_for_cleaning = data.Y;
   let x_cluster_removed = [];
   let y_cluster_removed = [];
+  // None case: fitting before any outlier removal
+  const [x0_none, y0_none, r_none] = fitGeometricLS(data.X, data.Y);
+  const none_radius_error = Math.abs(r_none - ((a + b) / 2.0));
 
   if (params.cluster_removal_mode === 1) {
     const clusterCleaned = removeClusterOutliersKNN(data.X, data.Y);
@@ -1068,7 +1073,8 @@ function runExperiment(params) {
       r: r_sel,
       r_ref: r_ref,
       center_error: center_error_sel,
-      radius_error: radius_error_sel
+      radius_error: radius_error_sel,
+      none_radius_error: none_radius_error
     }
   };
 }
